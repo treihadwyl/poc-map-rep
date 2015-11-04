@@ -277,3 +277,10 @@ function render() {
 }
 
 render()
+
+
+/**
+ * Add event listeners to the DOM elements
+ */
+document.querySelector( '.js-save' ).addEventListener( 'click', event => map.save() )
+document.querySelector( '.js-load' ).addEventListener( 'click', event => map.load() )

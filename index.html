@@ -2,10 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Document</title>
+  <title>POC Map Representation</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/3.0.3/normalize.min.css">
+  <style>
+    body {
+      font-family: "Coolville", "Helvetica Neue", "Lucida Grande", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .controls {
+      list-style-type: none;
+      padding: 0;
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 200px;
+      background: rgba( 0, 0, 0, .2 );
+      border-radius: 3px;
+      padding: 12px 0px;
+      margin: 0;
+    }
+    .controls li {
+      width: 100%;
+      font-size: 18px;
+      color: rgb( 0, 87, 132 );
+      line-height: 2;
+    }
+    .controls .btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+    }
+    .controls .btn:hover {
+      background: rgba( 0, 0, 0, .25 );
+    }
+  </style>
 </head>
 <body>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/EventEmitter/4.3.0/EventEmitter.js"></script>
+  <ul class="controls">
+    <li><button class="btn js-save">Save</button></li>
+    <li><button class="btn js-load">Load</button></li>
+  </ul>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/EventEmitter/4.3.0/EventEmitter.min.js"></script>
   <script src="index.js"></script>
 </body>
 </html>

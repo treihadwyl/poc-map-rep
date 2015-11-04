@@ -33,6 +33,7 @@ class MapData extends EventEmitter {
     this.data = new Uint8Array( width * height )
     this.data.fill( 1, 0, width * height )
 
+    // For POC just redraw everything whenever data changes
     this.on( 'update', render )
   }
 
@@ -58,7 +59,7 @@ class MapData extends EventEmitter {
 var wallH = new MapData( WIDTH, HEIGHT + 1 )
 var wallV = new MapData( WIDTH + 1, HEIGHT )
 var floor = new MapData( WIDTH, HEIGHT )
-floor.fill( 0 )
+floor.fill( 1 )
 
 var pos = [ 2, 2 ]
 
@@ -69,26 +70,32 @@ class Walls {
   constructor( x, y ) {
     Object.defineProperties( this, {
       'N': {
-        get: () => {
-          return wallH.get( x, y )
-        }
+        get: () => wallH.get( x, y ),
+        set: value => wallH.set( x, y, value )
       },
       'E': {
-        get: () => {
-          return wallV.get( x + 1, y )
-        }
+        get: () => wallV.get( x + 1, y ),
+        set: value => wallV.set( x + 1, y, value )
       },
       'S': {
-        get: () => {
-          return wallH.get( x, y + 1 )
-        }
+        get: () => wallH.get( x, y + 1 ),
+        set: value => wallH.set( x, y + 1, value )
       },
       'W': {
         get: () => {
           return wallV.get( x, y )
+        },
+        set: value => {
+          wallV.set( x, y, value )
         }
       }
     })
+  }
+  fill( value ) {
+    this.N = value
+    this.E = value
+    this.S = value
+    this.W = value
   }
 }
 /**
@@ -176,7 +183,32 @@ function renderTile( tile ) {
   ul.appendChild( li )
 
   li.addEventListener( 'click', event => {
+    console.log( event.offsetX, event.offsetY )
+
+    // Check if mouse is at the top, which would denote changing the N wall
+    // Use 20% of size as a bound
+    if ( event.offsetY < SIZE * .2 ) {
+      tile.walls.N = !tile.walls.N
+      return
+    }
+    if ( event.offsetY > SIZE * .8 ) {
+      tile.walls.S = !tile.walls.S
+      return
+    }
+    if ( event.offsetX < SIZE * .2 ) {
+      tile.walls.W = !tile.walls.W
+      return
+    }
+    if ( event.offsetX > SIZE * .8 ) {
+      tile.walls.E = !tile.walls.E
+      return
+    }
+
     tile.type = !tile.type
+
+    // If setting the whole tile then quickly set all the walls
+    //tile.walls.fill( tile.type )
+    // Actually, from a user viewpoint this is all a bit funky, needs work
   })
 }
 

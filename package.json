@@ -1,0 +1,32 @@
+{
+  "name": "poc-map-rep",
+  "private": true,
+  "version": "0.0.0",
+  "description": "POC for the treihadwyl map representation",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "browserify -t babelify --debug index.js > build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/treihadwyl/poc-map-rep.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/treihadwyl/poc-map-rep/issues"
+  },
+  "homepage": "https://github.com/treihadwyl/poc-map-rep",
+  "dependencies": {
+    "eventemitter3": "^1.1.1",
+    "level-js": "^2.2.2",
+    "level-promisify": "^2.0.1",
+    "levelup": "^1.2.1"
+  },
+  "devDependencies": {
+    "babel-preset-urban": "^0.2.0",
+    "babelify": "^7.2.0",
+    "browserify": "^12.0.1"
+  }
+}

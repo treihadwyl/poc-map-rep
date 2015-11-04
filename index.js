@@ -1,4 +1,16 @@
-'use strict'
+
+import EventEmitter from 'eventemitter3'
+
+import leveljs from 'level-js'
+import levelup from 'levelup'
+import promisify from 'level-promisify'
+
+let raw = levelup( 'TRmap', {
+  db: leveljs,
+  valueEncoding: 'binary'
+})
+
+let db = promisify( raw )
 
 const WIDTH = 10
 const HEIGHT = 10
@@ -86,17 +98,19 @@ class MapFormat extends EventEmitter {
     this.saveKey = 'tr_map'
   }
 
-  save() {
+  saveLS() {
     var total = new Uint8Array( this.buf )
     var data = btoa( String.fromCharCode.apply( null, total ) )
 
+    // @TODO could do basic compression, eg AAAAA = 5A
+
     localStorage.setItem( this.saveKey, data )
-    console.log( 'map saved' )
+    console.log( 'map saved to local storage' )
 
     return data
   }
 
-  load( format ) {
+  loadLS( format ) {
     let data = format || localStorage.getItem( this.saveKey )
 
     let decoded = atob( data )
@@ -113,6 +127,36 @@ class MapFormat extends EventEmitter {
     console.log( 'map loaded' )
     this.emit( 'update' )
     return decoded
+  }
+
+  save() {
+    // Stuff raw binary map data into idb
+    db.put( this.saveKey, this.buf )
+      .then( () => {
+        console.log( 'map saved to database' )
+      })
+      .catch( err => {
+        console.error( 'Error saving to idb' )
+        console.error( err )
+      })
+  }
+
+  load( format ) {
+    db.get( this.saveKey )
+      .then( data => {
+        // @TODO best way?
+        let total = new Uint8Array( this.buf )
+        data.forEach( ( char, index ) => {
+          total[ index ] = char
+        })
+
+        console.log( 'map loaded from db' )
+        this.emit( 'update' )
+      })
+      .catch( err => {
+        console.error( 'Error retrieving data' )
+        console.error( err )
+      })
   }
 }
 

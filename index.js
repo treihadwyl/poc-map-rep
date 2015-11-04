@@ -1,13 +1,13 @@
 'use strict'
 
-const WIDTH = 5
-const HEIGHT = 5
-const SIZE = 60
+const WIDTH = 10
+const HEIGHT = 10
+const SIZE = 50
 
 /**
  * Raw floor array data
  */
-var floor = new Uint8Array( WIDTH * HEIGHT )
+// var floorData = new Uint8Array( WIDTH * HEIGHT )
 
 function clamp( num, min, max ) {
   return num < min ? min : num > max ? max : num
@@ -23,7 +23,7 @@ function checkBounds( num, min, max ) {
 /**
  * Holds the map of wall data and its getter/setter
  */
-class WallData extends EventEmitter {
+class MapData extends EventEmitter {
   constructor( width, height ) {
     super()
     this.width = width
@@ -49,50 +49,18 @@ class WallData extends EventEmitter {
     this.data[ y * this.width + x ] = value
     this.emit( 'update' )
   }
+
+  fill( value ) {
+    this.data.fill( value, 0, this.width * this.height )
+  }
 }
 
-var wallH = new WallData( WIDTH, HEIGHT + 1 )
-var wallV = new WallData( WIDTH + 1, HEIGHT )
+var wallH = new MapData( WIDTH, HEIGHT + 1 )
+var wallV = new MapData( WIDTH + 1, HEIGHT )
+var floor = new MapData( WIDTH, HEIGHT )
+floor.fill( 0 )
 
 var pos = [ 2, 2 ]
-
-// console.log(
-//   ' ',
-//   get( wallH, pos[ 0 ] - 1, pos[ 1 ] - 1 ) ? '-' : ' ',
-//   ' ',
-//   get( wallH, pos[ 0 ]    , pos[ 1 ] - 1 ) ? '-' : ' ',
-//   ' ',
-//   get( wallH, pos[ 0 ] + 1, pos[ 1 ] - 1 ) ? '-' : ' '
-// )
-//
-// console.log(
-//   ' ',
-//   ' ',
-//   get( wallV, pos[ 0 ]    , pos[ 1 ] - 1 ) ? '|' : ' ',
-//   ' ',
-//   get( wallV, pos[ 0 ] + 1, pos[ 1 ] - 1 ) ? '|' : ' ',
-//   ' ',
-//   ' '
-// )
-//
-// console.log(
-//   ' ',
-//   get( wallH, pos[ 0 ] - 1, pos[ 1 ] ) ? '—' : ' ',
-//   ' ',
-//   get( wallH, pos[ 0 ]    , pos[ 1 ] ) ? '—' : ' ',
-//   ' ',
-//   get( wallH, pos[ 0 ] + 1, pos[ 1 ] ) ? '—' : ' '
-// )
-//
-// console.log(
-//   ' ',
-//   ' ',
-//   get( wallV, pos[ 0 ]    , pos[ 1 ] ) ? '|' : ' ',
-//   ' ',
-//   get( wallV, pos[ 0 ] + 1, pos[ 1 ] ) ? '|' : ' ',
-//   ' ',
-//   ' '
-// )
 
 /**
  * Use functional lookup to keep this shizzle by reference
@@ -128,8 +96,7 @@ class Walls {
  * wall segments as pointers
  */
 class Tile {
-  constructor( bit, x, y ) {
-    this.type = bit
+  constructor( x, y ) {
     // This creates a new array, does not pass by reference
     // this.walls = new Uint8Array([
     //   get( wallH, x, y ), // N
@@ -154,26 +121,31 @@ class Tile {
 
     // This is all cool with the lookups
     this.walls = new Walls( x, y )
+
+    Object.defineProperty( this, 'type', {
+      get: function() {
+        return floor.get( x, y )
+      },
+      set: function( value ) {
+        floor.set( x, y, value )
+      }
+    })
   }
 }
 
 var tiles = []
 for ( let y = 0; y < HEIGHT; y++ ) {
   for ( let x = 0; x < WIDTH; x++ ) {
-    console.log( 'generating', x, y )
-    tiles.push( new Tile( 0, x, y ) )
+    //console.log( 'generating', x, y )
+    tiles.push( new Tile( x, y ) )
   }
 }
 
-// So, tiles[ 0 ].walls should all be 1 as all the wall arrays were
-// initialised to 1, cant tell yet whether its correct or not though
-console.log( '\n', '- Before manipulating the wall array' )
-console.log( tiles[ 0 ] )
-
-// Manip first horizontal wall, which should be N for the tile
-wallH[ 0 ] = 2
-console.log( '\n', '- After manipulating the wall array' )
-console.log( tiles[ 0 ] )
+/**
+ * Setup the rendering
+ */
+var borderColor = 'rgb( 78, 74, 78 )'
+var solidColor = 'rgb( 117, 113, 97 )'
 
 var ul = document.createElement( 'ul' )
 Object.assign( ul.style, {
@@ -196,14 +168,20 @@ function renderTile( tile ) {
     height: SIZE + 'px',
     'box-sizing': 'border-box'
   })
-  li.style[ 'border-top' ] = tile.walls.N ? '1px solid #34d4d8' : ''
-  li.style[ 'border-right' ] = tile.walls.E ? '1px solid #34d4d8' : ''
-  li.style[ 'border-bottom' ] = tile.walls.S ? '1px solid #34d4d8' : ''
-  li.style[ 'border-left' ] = tile.walls.W ? '1px solid #34d4d8' : ''
+  li.style[ 'border-top' ] = tile.walls.N ? '1px solid ' + borderColor : ''
+  li.style[ 'border-right' ] = tile.walls.E ? '1px solid ' + borderColor : ''
+  li.style[ 'border-bottom' ] = tile.walls.S ? '1px solid ' + borderColor : ''
+  li.style[ 'border-left' ] = tile.walls.W ? '1px solid ' + borderColor : ''
+  li.style[ 'background' ] = tile.type ? solidColor : ''
   ul.appendChild( li )
+
+  li.addEventListener( 'click', event => {
+    tile.type = !tile.type
+  })
 }
 
 function render() {
+  //console.log( 'render' )
   ul.innerHTML = null
   tiles.forEach( renderTile )
 }

@@ -23,18 +23,15 @@ function checkBounds( num, min, max ) {
 /**
  * Holds the map of wall data and its getter/setter
  */
-class MapData extends EventEmitter {
-  constructor( width, height ) {
+class Raw extends EventEmitter {
+  constructor( buffer, offset, width, height ) {
     super()
     this.width = width
     this.height = height
 
     // Create new data array and fill with 1's (solid)
-    this.data = new Uint8Array( width * height )
+    this.data = new Uint8Array( buffer, offset, width * height )
     this.data.fill( 1, 0, width * height )
-
-    // For POC just redraw everything whenever data changes
-    this.on( 'update', render )
   }
 
   get( x, y ) {
@@ -54,14 +51,75 @@ class MapData extends EventEmitter {
   fill( value ) {
     this.data.fill( value, 0, this.width * this.height )
   }
+
+  get length() {
+    return this.data.length
+  }
 }
 
-var wallH = new MapData( WIDTH, HEIGHT + 1 )
-var wallV = new MapData( WIDTH + 1, HEIGHT )
-var floor = new MapData( WIDTH, HEIGHT )
-floor.fill( 1 )
 
-var pos = [ 2, 2 ]
+class MapFormat extends EventEmitter {
+  constructor() {
+    super()
+
+    // Based on height-width create a buffer to hold all the data
+    this.buf = new ArrayBuffer(
+      ( WIDTH * HEIGHT ) +
+      ( WIDTH * ( HEIGHT + 1 ) ) +
+      ( ( WIDTH + 1 ) * HEIGHT )
+    )
+
+    // Create raw buffers to hold different bits of data,
+    // also supply offsets to the main buffer data
+    this.floor = new Raw( this.buf, 0, WIDTH, HEIGHT )
+    this.wallH = new Raw( this.buf, ( WIDTH * HEIGHT ), WIDTH, HEIGHT + 1 )
+    this.wallV = new Raw( this.buf, ( WIDTH * HEIGHT ) + ( WIDTH * ( HEIGHT + 1 ) ), WIDTH + 1, HEIGHT )
+
+    // Add event listeners for the data views
+    // For POC just re-render anything on any update
+    this.floor.on( 'update', render )
+    this.wallH.on( 'update', render )
+    this.wallV.on( 'update', render )
+
+    // save key for stuffing into local storage
+    // @TODO indexeddb should be able to handle the binary
+    this.saveKey = 'tr_map'
+  }
+
+  save() {
+    var total = new Uint8Array( this.buf )
+    var data = btoa( String.fromCharCode.apply( null, total ) )
+
+    localStorage.setItem( this.saveKey, data )
+    console.log( 'map saved' )
+
+    return data
+  }
+
+  load( format ) {
+    let data = format || localStorage.getItem( this.saveKey )
+
+    let decoded = atob( data )
+      .split( '' )
+      .map( c => c.charCodeAt( 0 ) )
+
+    let total = new Uint8Array( this.buf )
+
+    // Copy over @TODO best way?
+    decoded.forEach( ( char, index ) => {
+      total[ index ] = char
+    })
+
+    console.log( 'map loaded' )
+    this.emit( 'update' )
+    return decoded
+  }
+}
+
+var map = new MapFormat()
+
+// For POC just re-render when the data changes
+map.on( 'update', render )
 
 /**
  * Use functional lookup to keep this shizzle by reference
@@ -70,23 +128,23 @@ class Walls {
   constructor( x, y ) {
     Object.defineProperties( this, {
       'N': {
-        get: () => wallH.get( x, y ),
-        set: value => wallH.set( x, y, value )
+        get: () => map.wallH.get( x, y ),
+        set: value => map.wallH.set( x, y, value )
       },
       'E': {
-        get: () => wallV.get( x + 1, y ),
-        set: value => wallV.set( x + 1, y, value )
+        get: () => map.wallV.get( x + 1, y ),
+        set: value => map.wallV.set( x + 1, y, value )
       },
       'S': {
-        get: () => wallH.get( x, y + 1 ),
-        set: value => wallH.set( x, y + 1, value )
+        get: () => map.wallH.get( x, y + 1 ),
+        set: value => map.wallH.set( x, y + 1, value )
       },
       'W': {
         get: () => {
-          return wallV.get( x, y )
+          return map.wallV.get( x, y )
         },
         set: value => {
-          wallV.set( x, y, value )
+          map.wallV.set( x, y, value )
         }
       }
     })
@@ -131,10 +189,10 @@ class Tile {
 
     Object.defineProperty( this, 'type', {
       get: function() {
-        return floor.get( x, y )
+        return map.floor.get( x, y )
       },
       set: function( value ) {
-        floor.set( x, y, value )
+        map.floor.set( x, y, value )
       }
     })
   }
@@ -183,7 +241,7 @@ function renderTile( tile ) {
   ul.appendChild( li )
 
   li.addEventListener( 'click', event => {
-    console.log( event.offsetX, event.offsetY )
+    // console.log( event.offsetX, event.offsetY )
 
     // Check if mouse is at the top, which would denote changing the N wall
     // Use 20% of size as a bound

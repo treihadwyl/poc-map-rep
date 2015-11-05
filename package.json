@@ -21,10 +21,12 @@
   "homepage": "https://github.com/treihadwyl/poc-map-rep",
   "dependencies": {
     "eventemitter3": "^1.1.1",
+    "image-rotate": "^1.0.0",
     "level-js": "^2.2.2",
     "level-promisify": "^2.0.1",
     "levelup": "^1.2.1",
-    "ndarray": "^1.0.18"
+    "ndarray": "^1.0.18",
+    "zeros": "^1.0.0"
   },
   "devDependencies": {
     "babel-preset-urban": "^0.2.0",

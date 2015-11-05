@@ -15,18 +15,6 @@ const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
 const BLOCK_SIZE = 40
 
-// Source of truth - underlying data store
-var buf = window.buf = new ArrayBuffer( WIDTH * HEIGHT )
-
-// Just a view on to the data
-var view = window.view = new Uint8Array( buf )
-
-// Uses the view to access the buffer
-var arr = window.arr = ndarray( view, [ WIDTH, HEIGHT ] )
-
-fill( arr, ( x, y ) => {
-  return 0
-})
 
 /**
  * Helpers
@@ -42,6 +30,24 @@ function checkBounds( num, min, max ) {
   return true
 }
 
+
+// Array offsets into floor, wallH, wallV
+var offsets = [
+  0,
+  ( WIDTH + 1 ) * HEIGHT,
+  ( ( WIDTH + 1 ) * HEIGHT ) + ( WIDTH * ( HEIGHT + 1 ) )
+]
+
+// Quick total byte length of array
+var byteLength = ( ( WIDTH * HEIGHT ) +
+( WIDTH * ( HEIGHT + 1 ) ) +
+( ( WIDTH + 1 ) * HEIGHT ) )
+
+// Source of truth - underlying data store
+var buf = window.buf = new ArrayBuffer( byteLength )
+
+// A debug view on the data
+var view = window.view = new Uint8Array( buf )
 
 /**
  * Holds the raw 2d array data
@@ -83,9 +89,9 @@ class MapFormat extends EventEmitter {
   constructor( buffer ) {
     super()
 
-    this.floor = new Raw( buffer, 0, WIDTH, HEIGHT )
-    this.wallH = new Raw( buffer, 0, WIDTH, HEIGHT )
-    this.wallV = new Raw( buffer, 0, WIDTH, HEIGHT )
+    this.floor = new Raw( buffer, offsets[ 0 ], WIDTH, HEIGHT )
+    this.wallH = new Raw( buffer, offsets[ 1 ], WIDTH, HEIGHT + 1 )
+    this.wallV = new Raw( buffer, offsets[ 2 ], WIDTH + 1, HEIGHT )
 
     this.floor.on( 'update', () => render() )
   }
@@ -149,6 +155,9 @@ class Tile {
     })
   }
 
+  /**
+   * Currently expects x and y clamped 0...1, 0,0 is TL, 1,1 is BR
+   */
   onClick( x, y ) {
     this.type = !this.type
   }
@@ -257,10 +266,36 @@ function getColor( value ) {
 function renderTile( x, y, tile ) {
   ctx.fillStyle = getColor( tile.type )
   ctx.fillRect( x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 1, BLOCK_SIZE - 1 )
+
+  // render each wall segment
+  ctx.strokeStyle = getColor( 4 )
+
+  // N
+  ctx.beginPath()
+  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
+  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, y * BLOCK_SIZE )
+  ctx.stroke()
+
+  // S
+  ctx.beginPath()
+  ctx.moveTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.stroke()
+
+  // E
+  ctx.beginPath()
+  ctx.moveTo( ( x + 1 ) * BLOCK_SIZE, y * BLOCK_SIZE )
+  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.stroke()
+  // W
+  ctx.beginPath()
+  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
+  ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.stroke()
 }
 
 var render = function render() {
-  console.log( 'render' )
+  //console.log( 'render' )
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
   for ( var x = 0; x < WIDTH; x++ ) {
     for ( var y = 0; y < HEIGHT; y++ ) {
@@ -271,6 +306,15 @@ var render = function render() {
 window.render = render
 render()
 
+
+canvas.addEventListener( 'mousedown', event => {
+  // Transform canvas coords to tile map coords
+  // @TODO does not consider canvas touches outside of rendered area
+  let x = event.offsetX / BLOCK_SIZE
+  let y = event.offsetY / BLOCK_SIZE
+  tiles.get( ~~x, ~~y )
+    .onClick( x, y )
+})
 
 // document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
 // document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )

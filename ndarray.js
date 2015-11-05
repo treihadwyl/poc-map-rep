@@ -106,6 +106,23 @@ window.transform = function transform( fn ) {
   logdata( arr )
 }
 
+window.rotateCW = function rotateCW() {
+   transform( ( y, x ) => {
+    return arr.get( x, arr.shape[ 1 ] - 1 - y )
+  })
+}
+window.rotateCCW = function rotateCCW() {
+  transform( ( y, x ) => {
+    return arr.get( arr.shape[ 0 ] - 1 - x, y )
+  })
+}
+// Flip X and Flip Y, mirror from TR corner to BL
+window.rotateFoldTR = function rotateFoldTR() {
+  transform( ( y, x ) => {
+    return arr.get( arr.shape[ 0 ] - 1 - x, arr.shape[ 1 ] - 1 - y )
+  })
+}
+
 /**
  * go bareback with cwise
  */
@@ -171,4 +188,5 @@ window.render = function render() {
 render()
 
 
-document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => transform() )
+document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
+document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )

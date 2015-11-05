@@ -5,6 +5,10 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
+import ndarray from 'ndarray'
+
+window.ndarray = ndarray
+
 let raw = levelup( 'TRmap', {
   db: leveljs,
   valueEncoding: 'binary'
@@ -160,7 +164,7 @@ class MapFormat extends EventEmitter {
   }
 }
 
-var map = new MapFormat()
+var map = window.map = new MapFormat()
 
 // For POC just re-render when the data changes
 map.on( 'update', render )
@@ -319,6 +323,8 @@ function render() {
   ul.innerHTML = null
   tiles.forEach( renderTile )
 }
+
+window.render = render
 
 render()
 

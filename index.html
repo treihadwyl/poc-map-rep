@@ -8,6 +8,7 @@
     body {
       font-family: "Coolville", "Helvetica Neue", "Lucida Grande", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
+      background: rgb( 248, 248, 248 );
     }
     .controls {
       list-style-type: none;
@@ -35,6 +36,13 @@
     .controls .btn:hover {
       background: rgba( 0, 0, 0, .25 );
     }
+
+    .canvas {
+      width: 640px;
+      height: 480px;
+      background: rgb( 255, 255, 255 );
+      margin: 5px;
+    }
   </style>
 </head>
 <body>
@@ -42,6 +50,7 @@
     <li><button class="btn js-save">Save</button></li>
     <li><button class="btn js-load">Load</button></li>
   </ul>
+  <canvas class="canvas js-canvas" width="640" height="480"></canvas>
   <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/idbwrapper/1.6.0/idbstore.min.js"></script>-->
   <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/EventEmitter/4.3.0/EventEmitter.min.js"></script>-->
   <script src="build.js"></script>

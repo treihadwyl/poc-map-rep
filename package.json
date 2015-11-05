@@ -6,7 +6,8 @@
   "main": "index.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "browserify -t babelify --debug index.js > build.js"
+    "build": "browserify -t babelify --debug ndarray.js > build.js",
+    "watch": "watchify ndarray.js -t babelify --debug -o build.js"
   },
   "repository": {
     "type": "git",
@@ -22,11 +23,13 @@
     "eventemitter3": "^1.1.1",
     "level-js": "^2.2.2",
     "level-promisify": "^2.0.1",
-    "levelup": "^1.2.1"
+    "levelup": "^1.2.1",
+    "ndarray": "^1.0.18"
   },
   "devDependencies": {
     "babel-preset-urban": "^0.2.0",
     "babelify": "^7.2.0",
-    "browserify": "^12.0.1"
+    "browserify": "^12.0.1",
+    "watchify": "^3.6.0"
   }
 }

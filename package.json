@@ -20,12 +20,16 @@
   },
   "homepage": "https://github.com/treihadwyl/poc-map-rep",
   "dependencies": {
+    "cwise": "^1.0.8",
     "eventemitter3": "^1.1.1",
     "image-rotate": "^1.0.0",
     "level-js": "^2.2.2",
     "level-promisify": "^2.0.1",
     "levelup": "^1.2.1",
     "ndarray": "^1.0.18",
+    "ndarray-fill": "^1.0.1",
+    "ndarray-unpack": "^1.0.0",
+    "ndarray-warp": "^1.0.1",
     "zeros": "^1.0.0"
   },
   "devDependencies": {

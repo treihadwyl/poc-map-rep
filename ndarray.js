@@ -13,9 +13,11 @@ var lena = window.lena = require( 'lena' )
 var luminance = window.luminance = require( 'luminance' )
 var warp = window.warp = require( 'ndarray-warp' )
 var unpack = window.unpack = require( 'ndarray-unpack' )
+var cwise = window.cwise = require( 'cwise' )
+var fill = window.fill = require( 'ndarray-fill' )
 
-const WIDTH = window.WIDTH = 5
-const HEIGHT = window.HEIGHT = 5
+const WIDTH = window.WIDTH = 2
+const HEIGHT = window.HEIGHT = 2
 
 // Source of truth - underlying data store
 //var buf = window.buf = new ArrayBuffer( WIDTH * HEIGHT * 2 )
@@ -28,10 +30,14 @@ view.fill( 0 )
 // Uses the view to access the buffer
 var arr = window.arr = ndarray( view, [ WIDTH, HEIGHT ] )
 
-arr.set( 0, 0, 1 )
-arr.set( 1, 0, 2 )
-arr.set( 2, 0, 3 )
-arr.set( 3, 0, 4 )
+// arr.set( 0, 0, 1 )
+// arr.set( 1, 0, 2 )
+// arr.set( 2, 0, 3 )
+// arr.set( 3, 0, 4 )
+var index = 0
+fill( arr, ( x, y ) => {
+  return arr.shape[ 0 ] * y + x
+})
 
 // Checking that a everyone is actually just manipulating the buffer
 var view2 = window.view2 = new Uint8Array( buf )
@@ -47,7 +53,7 @@ console.log( 0, ':', view2 )
 /**
  * Test rotating this bad boy
  */
-var res = window.res = zeros([ WIDTH, HEIGHT ], 'uint8' )
+var res = window.res = ndarray( new Uint8Array( WIDTH * HEIGHT ), [ WIDTH, HEIGHT ] )
 function rotate( angle ) {
   // var res = zeros([ WIDTH, HEIGHT ], 'uint8' )
   // imageRotate( res, arr, angle )
@@ -59,18 +65,38 @@ function rotate( angle ) {
 window.rotate = rotate
 
 
+/**
+ * Uses ndarray-warp to do stuff
+ */
+// window.transform = function transform( fn ) {
+//   fn = fn || function func( o, i ) {
+//     o[ 0 ] = i[ 1 ]
+//     o[ 1 ] = i[ 0 ]
+//   }
+//
+//   warp( res, arr, fn )
+//
+//   // now update array data, warp( arr, arr, fn ) does not work as it mutates arr
+//   // during the function
+//   // @TODO this needs to be a copy, as arr no longer refs buf after this
+//   //arr.data = res.data
+//   res.data.forEach( ( val, index ) => {
+//     arr.data[ index ] = val
+//   })
+//   render()
+//   logdata( arr )
+// }
+
+/**
+ * Rotates arr 90 CW
+ */
 window.transform = function transform( fn ) {
-  fn = fn || function func( o, i ) {
-    o[ 0 ] = i[ 1 ]
-    o[ 1 ] = i[ 0 ]
+  fn = fn || function iterate( y, x ) {
+    return arr.get( x, arr.shape[ 1 ] - 1 - y )
   }
 
-  warp( res, arr, fn )
+  fill( res, fn )
 
-  // now update array data, warp( arr, arr, fn ) does not work as it mutates arr
-  // during the function
-  // @TODO this needs to be a copy, as arr no longer refs buf after this
-  //arr.data = res.data
   res.data.forEach( ( val, index ) => {
     arr.data[ index ] = val
   })
@@ -79,11 +105,24 @@ window.transform = function transform( fn ) {
 }
 
 /**
+ * go bareback with cwise
+ */
+var mutate = window.mutate = cwise({
+  args: [ 'array', { blockIndices: 2 } ],
+  body: function( a, b ) {
+    console.log( a )
+    console.log( b )
+    a = b
+  }
+})
+
+/**
  * logs the array in 2d
  * transforms from row major to cartesian
  */
 window.logdata = function logdata( nda ) {
   let d = unpack( nda )
+  console.log( '---' )
   for ( let y = 0; y < nda.shape[ 1 ]; y++ ) {
     let row = []
     for ( let x = 0; x < nda.shape[ 0 ]; x++ ) {
@@ -91,6 +130,7 @@ window.logdata = function logdata( nda ) {
     }
     console.log( ...row )
   }
+  console.log( '---' )
 }
 
 

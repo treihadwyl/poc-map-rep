@@ -24,17 +24,22 @@
     }
     .controls li {
       width: 100%;
-      font-size: 18px;
-      color: rgb( 0, 87, 132 );
-      line-height: 2;
     }
     .controls .btn {
       width: 100%;
       background: transparent;
       border: none;
+      font-size: 18px;
+      color: rgb( 0, 87, 132 );
+      line-height: 2;
     }
     .controls .btn:hover {
       background: rgba( 0, 0, 0, .25 );
+    }
+    .controls .divider {
+      background: rgb( 178, 220, 239 );
+      height: 6px;
+      margin: 6px 0;
     }
 
     .canvas {
@@ -49,6 +54,8 @@
   <ul class="controls">
     <li><button class="btn js-save">Save</button></li>
     <li><button class="btn js-load">Load</button></li>
+    <li><div class="divider"></div></li>
+    <li><button class="btn js-rotcw">Rotate CW</button></li>
   </ul>
   <canvas class="canvas js-canvas" width="640" height="480"></canvas>
   <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/idbwrapper/1.6.0/idbstore.min.js"></script>-->

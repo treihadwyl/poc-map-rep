@@ -16,8 +16,8 @@ var unpack = window.unpack = require( 'ndarray-unpack' )
 var cwise = window.cwise = require( 'cwise' )
 var fill = window.fill = require( 'ndarray-fill' )
 
-const WIDTH = window.WIDTH = 2
-const HEIGHT = window.HEIGHT = 2
+const WIDTH = window.WIDTH = 3
+const HEIGHT = window.HEIGHT = 3
 
 // Source of truth - underlying data store
 //var buf = window.buf = new ArrayBuffer( WIDTH * HEIGHT * 2 )
@@ -91,6 +91,7 @@ window.rotate = rotate
  * Rotates arr 90 CW
  */
 window.transform = function transform( fn ) {
+  var start = performance.now()
   fn = fn || function iterate( y, x ) {
     return arr.get( x, arr.shape[ 1 ] - 1 - y )
   }
@@ -100,6 +101,7 @@ window.transform = function transform( fn ) {
   res.data.forEach( ( val, index ) => {
     arr.data[ index ] = val
   })
+  console.log( 'time', performance.now() - start )
   render()
   logdata( arr )
 }
@@ -121,6 +123,9 @@ var mutate = window.mutate = cwise({
  * transforms from row major to cartesian
  */
 window.logdata = function logdata( nda ) {
+  if ( nda.size > 255 ) {
+    return
+  }
   let d = unpack( nda )
   console.log( '---' )
   for ( let y = 0; y < nda.shape[ 1 ]; y++ ) {
@@ -164,3 +169,6 @@ window.render = function render() {
 }
 
 render()
+
+
+document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => transform() )

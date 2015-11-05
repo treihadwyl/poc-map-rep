@@ -16,8 +16,8 @@ var unpack = window.unpack = require( 'ndarray-unpack' )
 var cwise = window.cwise = require( 'cwise' )
 var fill = window.fill = require( 'ndarray-fill' )
 
-const WIDTH = window.WIDTH = 3
-const HEIGHT = window.HEIGHT = 3
+const WIDTH = window.WIDTH = 2
+const HEIGHT = window.HEIGHT = 2
 
 // Source of truth - underlying data store
 //var buf = window.buf = new ArrayBuffer( WIDTH * HEIGHT * 2 )
@@ -88,7 +88,7 @@ window.rotate = rotate
 // }
 
 /**
- * Rotates arr 90 CW
+ * Only works for square matrices
  */
 window.transform = function transform( fn ) {
   var start = performance.now()
@@ -116,12 +116,18 @@ window.rotateCCW = function rotateCCW() {
     return arr.get( arr.shape[ 0 ] - 1 - x, y )
   })
 }
+window.rotate180 = function rotate180() {
+  transform( ( y, x ) => {
+    return arr.get( arr.shape[ 1 ] - 1 - y, arr.shape[ 0 ] - 1 - x )
+  })
+}
 // Flip X and Flip Y, mirror from TR corner to BL
 window.rotateFoldTR = function rotateFoldTR() {
   transform( ( y, x ) => {
     return arr.get( arr.shape[ 0 ] - 1 - x, arr.shape[ 1 ] - 1 - y )
   })
 }
+
 
 /**
  * go bareback with cwise
@@ -190,3 +196,4 @@ render()
 
 document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
 document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
+document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )

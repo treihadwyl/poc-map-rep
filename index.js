@@ -47,9 +47,9 @@ function checkBounds( num, min, max ) {
  * Holds the raw 2d array data
  */
 window.Raw = class Raw extends EventEmitter {
-  constructor( offset, width, height ) {
+  constructor( buffer, offset, width, height ) {
     super()
-    this.data = ndarray( new Uint8Array( buf ), [ width, height ] )
+    this.data = ndarray( new Uint8Array( buffer ), [ width, height ] )
   }
 
   get width() {
@@ -80,18 +80,18 @@ window.Raw = class Raw extends EventEmitter {
  * Holds the entire map, i.e. all the sections
  */
 class MapFormat extends EventEmitter {
-  constructor() {
+  constructor( buffer ) {
     super()
 
-    this.floor = new Raw( 0, WIDTH, HEIGHT )
-    this.wallH = new Raw( 0, WIDTH, HEIGHT )
-    this.wallV = new Raw( 0, WIDTH, HEIGHT )
+    this.floor = new Raw( buffer, 0, WIDTH, HEIGHT )
+    this.wallH = new Raw( buffer, 0, WIDTH, HEIGHT )
+    this.wallV = new Raw( buffer, 0, WIDTH, HEIGHT )
 
-    this.floor.on( 'update', render )
+    this.floor.on( 'update', () => render() )
   }
 }
 
-var map = window.map = new MapFormat()
+var map = window.map = new MapFormat( buf )
 
 
 /**
@@ -148,17 +148,33 @@ class Tile {
       }
     })
   }
+
+  onClick( x, y ) {
+    this.type = !this.type
+  }
 }
 
 /**
  * Create the working list of tiles
  */
-var tiles = window.tiles = []
-for ( let y = 0; y < HEIGHT; y++ ) {
-  for ( let x = 0; x < WIDTH; x++ ) {
-    tiles.push( new Tile( x, y ) )
+class Tiles {
+  constructor() {
+    this.tiles = []
+    for ( let y = 0; y < HEIGHT; y++ ) {
+      for ( let x = 0; x < WIDTH; x++ ) {
+        this.tiles.push( new Tile( x, y ) )
+      }
+    }
+  }
+  get( x, y ) {
+    return this.tiles[ x + WIDTH * y ]
+  }
+  set( x, y, tile ) {
+    this.tiles[ x + WIDTH * y ] = tile
   }
 }
+
+var tiles = window.tiles = new Tiles()
 
 
 /**
@@ -243,20 +259,19 @@ function renderTile( x, y, tile ) {
   ctx.fillRect( x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 1, BLOCK_SIZE - 1 )
 }
 
-var render = window.render = function render() {
+var render = function render() {
+  console.log( 'render' )
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
-  // arr.shape[ 0 ] === width, but why hold on to width when the ndarray
-  // holds its shape anyway
-  for ( var x = 0; x < arr.shape[ 0 ]; x++ ) {
-    for ( var y = 0; y < arr.shape[ 1 ]; y++ ) {
-      renderTile( x, y, tiles[ x + WIDTH * y ] )
+  for ( var x = 0; x < WIDTH; x++ ) {
+    for ( var y = 0; y < HEIGHT; y++ ) {
+      renderTile( x, y, tiles.get( x, y ) )
     }
   }
 }
-
+window.render = render
 render()
 
 
-document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
-document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
-document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )
+// document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
+// document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
+// document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )

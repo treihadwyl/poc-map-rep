@@ -1,30 +1,36 @@
 
+var canvas = document.querySelector( '.canvas' )
+var ctx = window.ctx = canvas.getContext( '2d' )
+
 import EventEmitter from 'eventemitter3'
 
-import leveljs from 'level-js'
-import levelup from 'levelup'
-import promisify from 'level-promisify'
+var ndarray = window.ndarray = require( 'ndarray' )
+var unpack = window.unpack = require( 'ndarray-unpack' )
+var fill = window.fill = require( 'ndarray-fill' )
 
-import ndarray from 'ndarray'
+const WIDTH = window.WIDTH = 10
+const HEIGHT = window.HEIGHT = 10
 
-window.ndarray = ndarray
+const CANVAS_WIDTH = 640
+const CANVAS_HEIGHT = 480
+const BLOCK_SIZE = 40
 
-let raw = levelup( 'TRmap', {
-  db: leveljs,
-  valueEncoding: 'binary'
+// Source of truth - underlying data store
+var buf = window.buf = new ArrayBuffer( WIDTH * HEIGHT )
+
+// Just a view on to the data
+var view = window.view = new Uint8Array( buf )
+
+// Uses the view to access the buffer
+var arr = window.arr = ndarray( view, [ WIDTH, HEIGHT ] )
+
+fill( arr, ( x, y ) => {
+  return 0
 })
 
-let db = promisify( raw )
-
-const WIDTH = 10
-const HEIGHT = 10
-const SIZE = 50
-
 /**
- * Raw floor array data
+ * Helpers
  */
-// var floorData = new Uint8Array( WIDTH * HEIGHT )
-
 function clamp( num, min, max ) {
   return num < min ? min : num > max ? max : num
 }
@@ -36,141 +42,60 @@ function checkBounds( num, min, max ) {
   return true
 }
 
+
 /**
- * Holds the map of wall data and its getter/setter
+ * Holds the raw 2d array data
  */
-class Raw extends EventEmitter {
-  constructor( buffer, offset, width, height ) {
+window.Raw = class Raw extends EventEmitter {
+  constructor( offset, width, height ) {
     super()
-    this.width = width
-    this.height = height
-
-    // Create new data array and fill with 1's (solid)
-    this.data = new Uint8Array( buffer, offset, width * height )
-    this.data.fill( 1, 0, width * height )
+    this.data = ndarray( new Uint8Array( buf ), [ width, height ] )
   }
 
+  get width() {
+    return this.data.shape[ 0 ]
+  }
+  get height() {
+    return this.data.shape[ 1 ]
+  }
   get( x, y ) {
-    x = clamp( x, 0, this.width )
-    y = clamp( y, 0, this.height )
-    return this.data[ ( y * this.width ) + x ]
+    if ( !checkBounds( x, 0, this.width ) || !checkBounds( y, 0, this.height ) ) {
+      throw new Error( 'out of bounds' )
+    }
+    return this.data.get( x, y )
   }
-
   set( x, y, value ) {
     if ( !checkBounds( x, 0, this.width ) || !checkBounds( y, 0, this.height ) ) {
       throw new Error( 'out of bounds' )
     }
-    this.data[ y * this.width + x ] = value
+    this.data.set( x, y, value )
     this.emit( 'update' )
   }
-
-  fill( value ) {
-    this.data.fill( value, 0, this.width * this.height )
-  }
-
-  get length() {
-    return this.data.length
+  fill( value, fn ) {
+    fill( this.data, ( x, y ) => value )
   }
 }
 
-
+/**
+ * Holds the entire map, i.e. all the sections
+ */
 class MapFormat extends EventEmitter {
   constructor() {
     super()
 
-    // Based on height-width create a buffer to hold all the data
-    this.buf = new ArrayBuffer(
-      ( WIDTH * HEIGHT ) +
-      ( WIDTH * ( HEIGHT + 1 ) ) +
-      ( ( WIDTH + 1 ) * HEIGHT )
-    )
+    this.floor = new Raw( 0, WIDTH, HEIGHT )
+    this.wallH = new Raw( 0, WIDTH, HEIGHT )
+    this.wallV = new Raw( 0, WIDTH, HEIGHT )
 
-    // Create raw buffers to hold different bits of data,
-    // also supply offsets to the main buffer data
-    this.floor = new Raw( this.buf, 0, WIDTH, HEIGHT )
-    this.wallH = new Raw( this.buf, ( WIDTH * HEIGHT ), WIDTH, HEIGHT + 1 )
-    this.wallV = new Raw( this.buf, ( WIDTH * HEIGHT ) + ( WIDTH * ( HEIGHT + 1 ) ), WIDTH + 1, HEIGHT )
-
-    // Add event listeners for the data views
-    // For POC just re-render anything on any update
     this.floor.on( 'update', render )
-    this.wallH.on( 'update', render )
-    this.wallV.on( 'update', render )
-
-    // save key for stuffing into local storage
-    // @TODO indexeddb should be able to handle the binary
-    this.saveKey = 'tr_map'
-  }
-
-  saveLS() {
-    var total = new Uint8Array( this.buf )
-    var data = btoa( String.fromCharCode.apply( null, total ) )
-
-    // @TODO could do basic compression, eg AAAAA = 5A
-
-    localStorage.setItem( this.saveKey, data )
-    console.log( 'map saved to local storage' )
-
-    return data
-  }
-
-  loadLS( format ) {
-    let data = format || localStorage.getItem( this.saveKey )
-
-    let decoded = atob( data )
-      .split( '' )
-      .map( c => c.charCodeAt( 0 ) )
-
-    let total = new Uint8Array( this.buf )
-
-    // Copy over @TODO best way?
-    decoded.forEach( ( char, index ) => {
-      total[ index ] = char
-    })
-
-    console.log( 'map loaded' )
-    this.emit( 'update' )
-    return decoded
-  }
-
-  save() {
-    // Stuff raw binary map data into idb
-    db.put( this.saveKey, this.buf )
-      .then( () => {
-        console.log( 'map saved to database' )
-      })
-      .catch( err => {
-        console.error( 'Error saving to idb' )
-        console.error( err )
-      })
-  }
-
-  load( format ) {
-    db.get( this.saveKey )
-      .then( data => {
-        // @TODO best way?
-        let total = new Uint8Array( this.buf )
-        data.forEach( ( char, index ) => {
-          total[ index ] = char
-        })
-
-        console.log( 'map loaded from db' )
-        this.emit( 'update' )
-      })
-      .catch( err => {
-        console.error( 'Error retrieving data' )
-        console.error( err )
-      })
   }
 }
 
 var map = window.map = new MapFormat()
 
-// For POC just re-render when the data changes
-map.on( 'update', render )
 
 /**
- * Use functional lookup to keep this shizzle by reference
+ * Provides lookup getters to the underlying mapformat
  */
 class Walls {
   constructor( x, y ) {
@@ -204,34 +129,13 @@ class Walls {
     this.W = value
   }
 }
+
 /**
  * Use floor array to hold an object representing the tile, with
  * wall segments as pointers
  */
 class Tile {
   constructor( x, y ) {
-    // This creates a new array, does not pass by reference
-    // this.walls = new Uint8Array([
-    //   get( wallH, x, y ), // N
-    //   get( wallV, x + 1, y ), // E
-    //   get( wallH, x, y + 1 ), // S
-    //   get( wallV, x, y ), // W
-    // ])
-
-    // Doesnt work either, still by value
-    // this.temp = wallH[ 0 ]
-
-    // Certainly does work of course, although ugly
-    // Object.defineProperty( this, 'wallN', {
-    //   get: function() {
-    //     return get( wallH, x, y )
-    //   }
-    // })
-
-    // More nope
-    // this.w = []
-    // this.w.push( get( wallH, x, y ) )
-
     // This is all cool with the lookups
     this.walls = new Walls( x, y )
 
@@ -246,91 +150,113 @@ class Tile {
   }
 }
 
-var tiles = []
+/**
+ * Create the working list of tiles
+ */
+var tiles = window.tiles = []
 for ( let y = 0; y < HEIGHT; y++ ) {
   for ( let x = 0; x < WIDTH; x++ ) {
-    //console.log( 'generating', x, y )
     tiles.push( new Tile( x, y ) )
   }
 }
 
+
 /**
- * Setup the rendering
+ * Only works for square matrices
  */
-var borderColor = 'rgb( 78, 74, 78 )'
-var solidColor = 'rgb( 117, 113, 97 )'
+window.transform = function transform( fn ) {
+  var start = performance.now()
+  fn = fn || function iterate( y, x ) {
+    return arr.get( x, arr.shape[ 1 ] - 1 - y )
+  }
 
-var ul = document.createElement( 'ul' )
-Object.assign( ul.style, {
-  width: SIZE * WIDTH + 'px',
-  height: SIZE * HEIGHT + 'px',
-  position: 'absolute',
-  top: '20px',
-  left: '20px',
-  // border: '1px solid #acacac',
-  'list-style-type': 'none',
-  padding: 0
-})
-document.body.appendChild( ul )
+  fill( res, fn )
 
-function renderTile( tile ) {
-  var li = document.createElement( 'li' )
-  Object.assign( li.style, {
-    float: 'left',
-    width: SIZE + 'px',
-    height: SIZE + 'px',
-    'box-sizing': 'border-box'
+  res.data.forEach( ( val, index ) => {
+    arr.data[ index ] = val
   })
-  li.style[ 'border-top' ] = tile.walls.N ? '1px solid ' + borderColor : ''
-  li.style[ 'border-right' ] = tile.walls.E ? '1px solid ' + borderColor : ''
-  li.style[ 'border-bottom' ] = tile.walls.S ? '1px solid ' + borderColor : ''
-  li.style[ 'border-left' ] = tile.walls.W ? '1px solid ' + borderColor : ''
-  li.style[ 'background' ] = tile.type ? solidColor : ''
-  ul.appendChild( li )
+  console.log( 'time', performance.now() - start )
+  render()
+  logdata( arr )
+}
 
-  li.addEventListener( 'click', event => {
-    // console.log( event.offsetX, event.offsetY )
-
-    // Check if mouse is at the top, which would denote changing the N wall
-    // Use 20% of size as a bound
-    if ( event.offsetY < SIZE * .2 ) {
-      tile.walls.N = !tile.walls.N
-      return
-    }
-    if ( event.offsetY > SIZE * .8 ) {
-      tile.walls.S = !tile.walls.S
-      return
-    }
-    if ( event.offsetX < SIZE * .2 ) {
-      tile.walls.W = !tile.walls.W
-      return
-    }
-    if ( event.offsetX > SIZE * .8 ) {
-      tile.walls.E = !tile.walls.E
-      return
-    }
-
-    tile.type = !tile.type
-
-    // If setting the whole tile then quickly set all the walls
-    //tile.walls.fill( tile.type )
-    // Actually, from a user viewpoint this is all a bit funky, needs work
+window.rotateCW = function rotateCW() {
+   transform( ( y, x ) => {
+    return arr.get( x, arr.shape[ 1 ] - 1 - y )
+  })
+}
+window.rotateCCW = function rotateCCW() {
+  transform( ( y, x ) => {
+    return arr.get( arr.shape[ 0 ] - 1 - x, y )
+  })
+}
+window.rotate180 = function rotate180() {
+  transform( ( y, x ) => {
+    return arr.get( arr.shape[ 1 ] - 1 - y, arr.shape[ 0 ] - 1 - x )
   })
 }
 
-function render() {
-  //console.log( 'render' )
-  ul.innerHTML = null
-  tiles.forEach( renderTile )
+
+/**
+ * logs the array in 2d
+ * transforms from row major to cartesian
+ */
+window.logdata = function logdata( nda ) {
+  if ( nda.size > 255 ) {
+    return
+  }
+  let d = unpack( nda )
+  console.log( '---' )
+  for ( let y = 0; y < nda.shape[ 1 ]; y++ ) {
+    let row = []
+    for ( let x = 0; x < nda.shape[ 0 ]; x++ ) {
+      row.push( d[ x ][ y ] )
+    }
+    console.log( ...row )
+  }
+  console.log( '---' )
 }
 
-window.render = render
+
+/**
+ * Blanket render everything
+ */
+var colors = [
+  'rgb( 20, 12, 28 )',
+  'rgb( 47, 72, 78 )',
+  'rgb( 68, 137, 26 )',
+  'rgb( 163, 206, 39 )',
+  'rgb( 247, 226, 107 )'
+]
+function getColor( value ) {
+  if ( value < 0 || value > colors.length - 1 ) {
+    return 'rgb( 235, 137, 49 )'
+  }
+  return colors[ value ]
+}
+
+/**
+ * Renders the tile data at location x, y on screen
+ */
+function renderTile( x, y, tile ) {
+  ctx.fillStyle = getColor( tile.type )
+  ctx.fillRect( x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 1, BLOCK_SIZE - 1 )
+}
+
+var render = window.render = function render() {
+  ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
+  // arr.shape[ 0 ] === width, but why hold on to width when the ndarray
+  // holds its shape anyway
+  for ( var x = 0; x < arr.shape[ 0 ]; x++ ) {
+    for ( var y = 0; y < arr.shape[ 1 ]; y++ ) {
+      renderTile( x, y, tiles[ x + WIDTH * y ] )
+    }
+  }
+}
 
 render()
 
 
-/**
- * Add event listeners to the DOM elements
- */
-document.querySelector( '.js-save' ).addEventListener( 'click', event => map.save() )
-document.querySelector( '.js-load' ).addEventListener( 'click', event => map.load() )
+document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
+document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
+document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )

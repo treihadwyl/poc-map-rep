@@ -10,8 +10,8 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
-const WIDTH = window.WIDTH = 3
-const HEIGHT = window.HEIGHT = 3
+const WIDTH = window.WIDTH = 4
+const HEIGHT = window.HEIGHT = 4
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
@@ -93,21 +93,40 @@ window.Raw = class Raw extends EventEmitter {
     fill( this.data, ( x, y ) => value )
   }
 
-  rotate() {
-    // Just floor rotate for now
+  transform( fn ) {
+    if ( !fn ) {
+      throw new Error( 'Transforming raw data ndarray requires transformation function')
+    }
+
     let width = this.data.shape[ 0 ]
     let height = this.data.shape[ 1 ]
     let tmp = ndarray( new Uint8Array( width * height ), [ width, height ] )
 
-    fill( tmp, ( y, x ) => {
-      return this.data.get( x, height - 1 - y )
-    })
+    fill( tmp, fn )
 
     tmp.data.forEach( ( val, index ) => {
       this.data.data[ index + this.data.offset ] = val
     })
 
+    // @TODO necessary?
     this.emit( 'update' )
+  }
+
+  rotate() {
+    this.transform( ( y, x ) => {
+      return this.data.get( x, this.data.shape[ 1 ] - 1 - y )
+    })
+  }
+
+  translateX( amt ) {
+    this.transform( ( y, x ) => {
+      return this.data.get( x - amt, y )
+    })
+  }
+  translateY( amt ) {
+    this.transform( ( y, x ) => {
+      return this.data.get( x, y - amt )
+    })
   }
 }
 
@@ -232,6 +251,10 @@ class Tiles extends EventEmitter {
         this.tiles.push( new Tile( x, y ) )
       }
     }
+
+    // straight up, N, is 0
+    // W1, S2, E3
+    this.dir = 0
   }
   get( x, y ) {
     return this.tiles[ x + WIDTH * y ]
@@ -247,6 +270,30 @@ class Tiles extends EventEmitter {
     map.floor.rotate()
     map.wallH.rotate()
     map.wallV.rotate()
+
+    let temp = map.wallV
+    map.wallV = map.wallH
+    map.wallH = temp
+
+    // Increment and wrap to 4 cardinals
+    this.dir = this.dir + 1
+    if ( this.dir === 4 ) {
+      this.dir = 0
+    }
+
+    // Shift on south facing
+    if ( this.dir === 2 ) {
+      map.wallV.translateX( -1 )
+      map.wallH.translateX( -1 )
+    }
+
+    // Do funky shift on north facing
+    if ( this.dir === 0 ) {
+      map.wallV.translateY( -1 )
+      map.wallH.translateY( -1 )
+    }
+
+    render()
   }
 }
 
@@ -384,6 +431,9 @@ canvas.addEventListener( 'mousedown', event => {
  */
 document.querySelector( '.js-save' ).addEventListener( 'click', event => map.save() )
 document.querySelector( '.js-load' ).addEventListener( 'click', event => map.load() )
-// document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
+document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => tiles.rotate() )
 // document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
 // document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )
+document.querySelector( '.js-logfloor' ).addEventListener( 'click', event => logdata( map.floor.data ) )
+document.querySelector( '.js-logh' ).addEventListener( 'click', event => logdata( map.wallH.data ) )
+document.querySelector( '.js-logv' ).addEventListener( 'click', event => logdata( map.wallV.data ) )

@@ -17,7 +17,7 @@
       top: 5px;
       right: 5px;
       width: 200px;
-      background: rgba( 0, 0, 0, .2 );
+      background: rgba( 255, 255, 255, .1 );
       border-radius: 3px;
       padding: 12px 0px;
       margin: 0;
@@ -29,18 +29,27 @@
       width: 100%;
       background: transparent;
       border: none;
-      font-size: 18px;
+      font-size: 20px;
       color: rgb( 0, 87, 132 );
       line-height: 2;
     }
     .controls .btn:hover {
-      background: rgba( 0, 0, 0, .25 );
+      background: rgba( 255, 255, 255, .25 );
       color: rgb( 178, 220, 239 );
     }
     .controls .divider {
       background: rgb( 178, 220, 239 );
       height: 6px;
       margin: 6px 0;
+    }
+    .controls .info {
+      width: 100%;
+      background: transparent;
+      color: rgb( 163, 206, 39 );
+      font-size: 20px;
+      line-height: 40px;
+      min-height: 40px;
+      text-align: center;
     }
 
     .canvas {
@@ -56,6 +65,7 @@
     <li><button class="btn js-save">Save</button></li>
     <li><button class="btn js-load">Load</button></li>
     <li><div class="divider"></div></li>
+    <li><div class="info js-dir"></div></li>
     <li><button class="btn js-rotcw">Rotate CW</button></li>
     <li><button class="btn js-rotccw">Rotate CCW</button></li>
     <li><button class="btn js-rot180">Rotate 180</button></li>

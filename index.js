@@ -456,6 +456,8 @@ function renderWalls( x, y ) {
   }
 }
 
+var dirEl = document.querySelector( '.js-dir' )
+
 var render = function render() {
   //console.log( 'render' )
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
@@ -468,6 +470,10 @@ var render = function render() {
       renderWalls( x, y )
     }
   }
+
+  // Update direction indicator
+  var dirs = [ 'North', 'East', 'South', 'West' ]
+  dirEl.innerHTML = tiles.dir + ' ' + dirs[ tiles.dir ]
 }
 window.render = render
 render()

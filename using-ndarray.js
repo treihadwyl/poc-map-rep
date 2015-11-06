@@ -10,8 +10,8 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
-const WIDTH = window.WIDTH = 3
-const HEIGHT = window.HEIGHT = 3
+const WIDTH = window.WIDTH = 2
+const HEIGHT = window.HEIGHT = 2
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
@@ -19,12 +19,6 @@ const BLOCK_SIZE = 60
 
 var canvas = document.querySelector( '.canvas' )
 var ctx = window.ctx = canvas.getContext( '2d' )
-
-/**
- * This version has some overlap of the walls so there is some redundancy but
- * by making each array square it can be rotated far more easily
- * If walls are 3x3 then the walkable floor area will be 2x2
- */
 
 
 /**
@@ -45,15 +39,14 @@ function checkBounds( num, min, max ) {
 // Array offsets into floor, wallH, wallV
 var offsets = [
   0,
-  ( ( WIDTH - 1 ) * ( HEIGHT - 1 ) ),
-  ( ( WIDTH - 1 ) * ( HEIGHT - 1 ) ) + ( WIDTH * HEIGHT )
+  WIDTH * HEIGHT,
+  ( WIDTH * HEIGHT ) + ( WIDTH * ( HEIGHT + 1 ) )
 ]
 
 // Quick total byte length of array
-var byteLength = (
-  ( ( WIDTH -1 ) * ( HEIGHT - 1 ) ) +
-  ( WIDTH * HEIGHT * 2 )
-)
+var byteLength = ( ( WIDTH * HEIGHT ) +
+  ( WIDTH * ( HEIGHT + 1 ) ) +
+  ( ( WIDTH + 1 ) * HEIGHT ) )
 
 // Source of truth - underlying data store
 var buf = window.buf = new ArrayBuffer( byteLength )
@@ -101,9 +94,9 @@ class MapFormat extends EventEmitter {
   constructor( buffer ) {
     super()
 
-    this.floor = new Raw( buffer, offsets[ 0 ], WIDTH - 1, HEIGHT - 1 )
-    this.wallH = new Raw( buffer, offsets[ 1 ], WIDTH, HEIGHT )
-    this.wallV = new Raw( buffer, offsets[ 2 ], WIDTH, HEIGHT )
+    this.floor = new Raw( buffer, offsets[ 0 ], WIDTH, HEIGHT )
+    this.wallH = new Raw( buffer, offsets[ 1 ], WIDTH, HEIGHT + 1 )
+    this.wallV = new Raw( buffer, offsets[ 2 ], WIDTH + 1, HEIGHT )
 
     this.floor.on( 'update', () => render() )
     this.wallH.on( 'update', () => render() )
@@ -424,36 +417,12 @@ function renderTile( x, y, tile ) {
   ctx.stroke()
 }
 
-function renderFloor( x, y ) {
-  ctx.fillStyle = getColor( map.floor.get( x, y ) )
-  ctx.fillRect( ( x * BLOCK_SIZE ), ( y * BLOCK_SIZE ), BLOCK_SIZE, BLOCK_SIZE )
-}
-
-function renderWalls( x, y ) {
-  ctx.strokeStyle = getColor( map.wallH.get( x, y ) )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
-  ctx.stroke()
-
-  ctx.strokeStyle = getColor( map.wallV.get( x, y ) )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
-  ctx.stroke()
-}
-
 var render = function render() {
   //console.log( 'render' )
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
   for ( var x = 0; x < WIDTH; x++ ) {
     for ( var y = 0; y < HEIGHT; y++ ) {
-      //renderTile( x, y, tiles.get( x, y ) )
-      if ( x < WIDTH - 1 && y < HEIGHT - 1 ) {
-        renderFloor( x, y )
-      }
-
-      renderWalls( x, y )
+      renderTile( x, y, tiles.get( x, y ) )
     }
   }
 }

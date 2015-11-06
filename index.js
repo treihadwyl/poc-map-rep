@@ -9,8 +9,8 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
-const WIDTH = window.WIDTH = 10
-const HEIGHT = window.HEIGHT = 10
+const WIDTH = window.WIDTH = 2
+const HEIGHT = window.HEIGHT = 2
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
@@ -69,13 +69,13 @@ window.Raw = class Raw extends EventEmitter {
     return this.data.shape[ 1 ]
   }
   get( x, y ) {
-    if ( !checkBounds( x, 0, this.width ) || !checkBounds( y, 0, this.height ) ) {
+    if ( !checkBounds( x, 0, this.width - 1 ) || !checkBounds( y, 0, this.height - 1 ) ) {
       throw new Error( 'out of bounds' )
     }
     return this.data.get( x, y )
   }
   set( x, y, value ) {
-    if ( !checkBounds( x, 0, this.width ) || !checkBounds( y, 0, this.height ) ) {
+    if ( !checkBounds( x, 0, this.width - 1 ) || !checkBounds( y, 0, this.height - 1 ) ) {
       throw new Error( 'out of bounds' )
     }
     this.data.set( x, y, value )
@@ -146,41 +146,59 @@ class MapFormat extends EventEmitter {
 }
 
 var map = window.map = new MapFormat( buf )
-map.on( 'update', render )
+map.on( 'update', () => render() )
 
 /**
  * Provides lookup getters to the underlying mapformat
  */
 class Walls {
   constructor( x, y ) {
+    this.dir = [ 'N', 'E', 'S', 'W' ]
+    this.x = x
+    this.y = y
+
+    this._makeProps( this.x, this.y )
+  }
+  _makeProps( x, y ) {
     Object.defineProperties( this, {
-      'N': {
+      [ this.dir[ 0 ] ]: {
         get: () => map.wallH.get( x, y ),
-        set: value => map.wallH.set( x, y, value )
+        set: value => map.wallH.set( x, y, value ),
+        configurable: true
       },
-      'E': {
+      [ this.dir[ 1 ] ]: {
         get: () => map.wallV.get( x + 1, y ),
-        set: value => map.wallV.set( x + 1, y, value )
+        set: value => map.wallV.set( x + 1, y, value ),
+        configurable: true
       },
-      'S': {
+      [ this.dir[ 2 ] ]: {
         get: () => map.wallH.get( x, y + 1 ),
-        set: value => map.wallH.set( x, y + 1, value )
+        set: value => map.wallH.set( x, y + 1, value ),
+        configurable: true
       },
-      'W': {
+      [ this.dir[ 3 ] ]: {
         get: () => {
           return map.wallV.get( x, y )
         },
         set: value => {
           map.wallV.set( x, y, value )
-        }
+        },
+        configurable: true
       }
     })
   }
   fill( value ) {
-    this.N = value
-    this.E = value
-    this.S = value
-    this.W = value
+    this.dir.forEach( dir => {
+      this[ dir ] = value
+    })
+  }
+  log() {
+    let faces = [ 'N', 'E', 'S', 'W' ]
+    console.log( ...faces.map( dir => this[ dir ] ) )
+  }
+  rotate() {
+    this.dir = [ 'W', 'N', 'E', 'S' ]
+    this._makeProps( this.x, this.y )
   }
 }
 
@@ -248,6 +266,12 @@ class Tiles {
   }
   set( x, y, tile ) {
     this.tiles[ x + WIDTH * y ] = tile
+  }
+
+  rotateFaces() {
+    this.tiles.forEach( tile => {
+      tile.walls.rotate()
+    })
   }
 }
 
@@ -342,25 +366,25 @@ function renderTile( x, y, tile ) {
   ctx.strokeStyle = getColor( tile.walls.N ? 4 : 0 )
   ctx.beginPath()
   ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, y * BLOCK_SIZE )
+  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
   ctx.stroke()
   // S
   ctx.strokeStyle = getColor( tile.walls.S ? 4 : 0 )
   ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.moveTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
+  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, ( y + 1 ) * BLOCK_SIZE - 1 )
   ctx.stroke()
   // E
   ctx.strokeStyle = getColor( tile.walls.E ? 4 : 0 )
   ctx.beginPath()
-  ctx.moveTo( ( x + 1 ) * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.moveTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
+  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, ( y + 1 ) * BLOCK_SIZE - 1 )
   ctx.stroke()
   // W
   ctx.strokeStyle = getColor( tile.walls.W ? 4 : 0 )
   ctx.beginPath()
   ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
+  ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
   ctx.stroke()
 }
 

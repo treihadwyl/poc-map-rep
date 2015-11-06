@@ -10,8 +10,8 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
-const WIDTH = window.WIDTH = 4
-const HEIGHT = window.HEIGHT = 4
+const WIDTH = window.WIDTH = 3
+const HEIGHT = window.HEIGHT = 3
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
@@ -112,9 +112,19 @@ window.Raw = class Raw extends EventEmitter {
     this.emit( 'update' )
   }
 
-  rotate() {
+  rotateCW() {
     this.transform( ( y, x ) => {
       return this.data.get( x, this.data.shape[ 1 ] - 1 - y )
+    })
+  }
+  rotateCCW() {
+    this.transform( ( y, x ) => {
+      return this.data.get( this.data.shape[ 0 ] - 1 - x, y )
+    })
+  }
+  rotate180() {
+    this.transform( ( y, x ) => {
+      return this.data.get( this.data.shape[ 1 ] - 1 - y, this.data.shape[ 0 ] - 1 - x )
     })
   }
 
@@ -266,10 +276,10 @@ class Tiles extends EventEmitter {
   /**
    * Rotates each facet of the map format
    */
-  rotate() {
-    map.floor.rotate()
-    map.wallH.rotate()
-    map.wallV.rotate()
+  rotateCW() {
+    map.floor.rotateCW()
+    map.wallH.rotateCW()
+    map.wallV.rotateCW()
 
     let temp = map.wallV
     map.wallV = map.wallH
@@ -281,15 +291,61 @@ class Tiles extends EventEmitter {
       this.dir = 0
     }
 
-    // Shift on south facing
-    if ( this.dir === 2 ) {
-      map.wallV.translateX( -1 )
+    // Translate the extra buffer column as rotate fills it
+    if ( this.dir === 1 ) {
       map.wallH.translateX( -1 )
     }
-
-    // Do funky shift on north facing
+    if ( this.dir === 2 ) {
+      map.wallH.translateX( -1 )
+    }
+    if ( this.dir === 3 ) {
+      map.wallH.translateY( -1 )
+    }
     if ( this.dir === 0 ) {
-      map.wallV.translateY( -1 )
+      map.wallH.translateY( -1 )
+    }
+
+    render()
+  }
+  /**
+   * Rotates each facet of the map format
+   */
+  rotateCCW() {
+    map.floor.rotateCCW()
+    map.wallH.rotateCCW()
+    map.wallV.rotateCCW()
+
+    let temp = map.wallV
+    map.wallV = map.wallH
+    map.wallH = temp
+
+    // decrement and wrap to 4 cardinals
+    this.dir = this.dir - 1
+    if ( this.dir < 0 ) {
+      this.dir = 3
+    }
+
+    // Shift on east facing
+    // if ( this.dir === 3 ) {
+    //   map.wallV.translateX( -1 )
+    //   map.wallH.translateX( -1 )
+    // }
+    //
+    // // Do funky shift on west facing
+    // if ( this.dir === 1 ) {
+    //   map.wallV.translateY( -1 )
+    //   map.wallH.translateY( -1 )
+    // }
+    if ( this.dir === 1 ) {
+      map.wallH.translateX( -1 )
+    }
+    if ( this.dir === 2 ) {
+      map.wallH.translateX( -1 )
+    }
+    if ( this.dir === 3 ) {
+      map.wallH.translateY( -1 )
+    }
+    if ( this.dir === 0 ) {
       map.wallH.translateY( -1 )
     }
 
@@ -431,8 +487,8 @@ canvas.addEventListener( 'mousedown', event => {
  */
 document.querySelector( '.js-save' ).addEventListener( 'click', event => map.save() )
 document.querySelector( '.js-load' ).addEventListener( 'click', event => map.load() )
-document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => tiles.rotate() )
-// document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
+document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => tiles.rotateCW() )
+document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => tiles.rotateCCW() )
 // document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )
 document.querySelector( '.js-logfloor' ).addEventListener( 'click', event => logdata( map.floor.data ) )
 document.querySelector( '.js-logh' ).addEventListener( 'click', event => logdata( map.wallH.data ) )

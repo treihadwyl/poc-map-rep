@@ -1,12 +1,13 @@
 
-var canvas = document.querySelector( '.canvas' )
-var ctx = window.ctx = canvas.getContext( '2d' )
-
 import EventEmitter from 'eventemitter3'
 
-var ndarray = window.ndarray = require( 'ndarray' )
-var unpack = window.unpack = require( 'ndarray-unpack' )
-var fill = window.fill = require( 'ndarray-fill' )
+import ndarray from 'ndarray'
+import unpack from 'ndarray-unpack'
+import fill from 'ndarray-fill'
+
+import leveljs from 'level-js'
+import levelup from 'levelup'
+import promisify from 'level-promisify'
 
 const WIDTH = window.WIDTH = 10
 const HEIGHT = window.HEIGHT = 10
@@ -14,6 +15,9 @@ const HEIGHT = window.HEIGHT = 10
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
 const BLOCK_SIZE = 48
+
+var canvas = document.querySelector( '.canvas' )
+var ctx = window.ctx = canvas.getContext( '2d' )
 
 
 /**
@@ -96,11 +100,53 @@ class MapFormat extends EventEmitter {
     this.floor.on( 'update', () => render() )
     this.wallH.on( 'update', () => render() )
     this.wallV.on( 'update', () => render() )
+
+    this.buf = buffer
+    this.saveKey = 'tr_map'
+
+    /**
+     * Wrap leveljs in levelup, then wrap in promisify to get a promise
+     * based API
+     */
+    this.db = promisify( levelup( 'TRmap', {
+      db: leveljs,
+      valueEncoding: 'binary'
+    }))
+  }
+
+  save() {
+    // Stuff raw binary map data into idb
+    this.db.put( this.saveKey, this.buf )
+      .then( () => {
+        console.log( 'map saved to database' )
+      })
+      .catch( err => {
+        console.error( 'Error saving to idb' )
+        console.error( err )
+      })
+  }
+
+  load( format ) {
+    this.db.get( this.saveKey )
+      .then( data => {
+        // @TODO best way?
+        let total = new Uint8Array( this.buf )
+        data.forEach( ( char, index ) => {
+          total[ index ] = char
+        })
+
+        console.log( 'map loaded from db' )
+        this.emit( 'update' )
+      })
+      .catch( err => {
+        console.error( 'Error retrieving data' )
+        console.error( err )
+      })
   }
 }
 
 var map = window.map = new MapFormat( buf )
-
+map.on( 'update', render )
 
 /**
  * Provides lookup getters to the underlying mapformat
@@ -340,6 +386,11 @@ canvas.addEventListener( 'mousedown', event => {
     .onClick( x - ~~x, y - ~~y )
 })
 
+/**
+ * Add ui listeners
+ */
+document.querySelector( '.js-save' ).addEventListener( 'click', event => map.save() )
+document.querySelector( '.js-load' ).addEventListener( 'click', event => map.load() )
 // document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )
 // document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => rotateCCW() )
 // document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )

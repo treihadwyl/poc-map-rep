@@ -40,8 +40,8 @@ var offsets = [
 
 // Quick total byte length of array
 var byteLength = ( ( WIDTH * HEIGHT ) +
-( WIDTH * ( HEIGHT + 1 ) ) +
-( ( WIDTH + 1 ) * HEIGHT ) )
+  ( WIDTH * ( HEIGHT + 1 ) ) +
+  ( ( WIDTH + 1 ) * HEIGHT ) )
 
 // Source of truth - underlying data store
 var buf = window.buf = new ArrayBuffer( byteLength )
@@ -55,7 +55,7 @@ var view = window.view = new Uint8Array( buf )
 window.Raw = class Raw extends EventEmitter {
   constructor( buffer, offset, width, height ) {
     super()
-    this.data = ndarray( new Uint8Array( buffer ), [ width, height ], [ width, 1 ], offset )
+    this.data = ndarray( new Uint8Array( buffer ), [ width, height ], [ height, 1 ], offset )
   }
 
   get width() {
@@ -161,25 +161,24 @@ class Tile {
    * Currently expects x and y clamped 0...1, 0,0 is TL, 1,1 is BR
    */
   onClick( x, y ) {
-    console.log( x, y )
-    // Check if mouse is at the top, which would denote changing the N wall
-    // Use 20% of size as a bound
-    // if ( y < .2 ) {
-    //   this.walls.N = !this.walls.N
-    //   return
-    // }
-    // if ( y > .8 ) {
-    //   this.walls.S = !this.walls.S
-    //   return
-    // }
-    // if ( x < .2 ) {
-    //   this.walls.W = !this.walls.W
-    //   return
-    // }
-    // if ( x > .8 ) {
-    //   this.walls.E = !this.walls.E
-    //   return
-    // }
+    let shield = .1
+
+    if ( y < shield ) {
+      this.walls.N = !this.walls.N
+      return
+    }
+    if ( y > 1 - shield ) {
+      this.walls.S = !this.walls.S
+      return
+    }
+    if ( x < shield ) {
+      this.walls.W = !this.walls.W
+      return
+    }
+    if ( x > 1 - shield ) {
+      this.walls.E = !this.walls.E
+      return
+    }
 
 
     this.type = !this.type

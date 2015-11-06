@@ -8,12 +8,12 @@ var ndarray = window.ndarray = require( 'ndarray' )
 var unpack = window.unpack = require( 'ndarray-unpack' )
 var fill = window.fill = require( 'ndarray-fill' )
 
-const WIDTH = window.WIDTH = 2
-const HEIGHT = window.HEIGHT = 2
+const WIDTH = window.WIDTH = 10
+const HEIGHT = window.HEIGHT = 10
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
-const BLOCK_SIZE = 80
+const BLOCK_SIZE = 48
 
 
 /**
@@ -287,7 +287,7 @@ function getColor( value ) {
  */
 function renderTile( x, y, tile ) {
   ctx.fillStyle = getColor( tile.type )
-  ctx.fillRect( x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 1, BLOCK_SIZE - 1 )
+  ctx.fillRect( ( x * BLOCK_SIZE ), ( y * BLOCK_SIZE ), BLOCK_SIZE, BLOCK_SIZE )
 
   // render each wall segment
   // ctx.strokeStyle = getColor( 4 )

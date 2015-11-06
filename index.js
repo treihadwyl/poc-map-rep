@@ -92,6 +92,23 @@ window.Raw = class Raw extends EventEmitter {
   fill( value, fn ) {
     fill( this.data, ( x, y ) => value )
   }
+
+  rotate() {
+    // Just floor rotate for now
+    let width = this.data.shape[ 0 ]
+    let height = this.data.shape[ 1 ]
+    let tmp = ndarray( new Uint8Array( width * height ), [ width, height ] )
+
+    fill( tmp, ( y, x ) => {
+      return this.data.get( x, height - 1 - y )
+    })
+
+    tmp.data.forEach( ( val, index ) => {
+      this.data.data[ index + this.data.offset ] = val
+    })
+
+    this.emit( 'update' )
+  }
 }
 
 /**
@@ -157,71 +174,13 @@ var map = window.map = new MapFormat( buf )
 map.on( 'update', () => render() )
 
 /**
- * Provides lookup getters to the underlying mapformat
- */
-class Walls {
-  constructor( x, y ) {
-    this.dir = [ 'N', 'E', 'S', 'W' ]
-    this.x = x
-    this.y = y
-
-    this._makeProps( this.x, this.y )
-  }
-  _makeProps( x, y ) {
-    Object.defineProperties( this, {
-      [ this.dir[ 0 ] ]: {
-        get: () => map.wallH.get( x, y ),
-        set: value => map.wallH.set( x, y, value ),
-        configurable: true
-      },
-      [ this.dir[ 1 ] ]: {
-        get: () => map.wallV.get( x + 1, y ),
-        set: value => map.wallV.set( x + 1, y, value ),
-        configurable: true
-      },
-      [ this.dir[ 2 ] ]: {
-        get: () => map.wallH.get( x, y + 1 ),
-        set: value => map.wallH.set( x, y + 1, value ),
-        configurable: true
-      },
-      [ this.dir[ 3 ] ]: {
-        get: () => {
-          return map.wallV.get( x, y )
-        },
-        set: value => {
-          map.wallV.set( x, y, value )
-        },
-        configurable: true
-      }
-    })
-  }
-  fill( value ) {
-    this.dir.forEach( dir => {
-      this[ dir ] = value
-    })
-  }
-  log() {
-    let faces = [ 'N', 'E', 'S', 'W' ]
-    console.log( ...faces.map( dir => this[ dir ] ) )
-  }
-  /**
-   * See tiles.rotate for some of this junk
-   * The rotate shizzle isnt happening at the moment
-   */
-  rotate( amount ) {
-    this.dir = rotate( this.dir, amount )
-    this._makeProps( this.x, this.y )
-  }
-}
-
-/**
- * Use floor array to hold an object representing the tile, with
- * wall segments as pointers
+ * Tile just holds floor data and handles ops on tiles
+ * Currently hardcoded to the map format object
  */
 class Tile {
   constructor( x, y ) {
-    // This is all cool with the lookups
-    this.walls = new Walls( x, y )
+    this.x = x
+    this.y = y
 
     Object.defineProperty( this, 'type', {
       get: function() {
@@ -240,19 +199,19 @@ class Tile {
     let shield = .1
 
     if ( y < shield ) {
-      this.walls.N = !this.walls.N
+      map.wallH.set( this.x, this.y, !map.wallH.get( this.x, this.y ) )
       return
     }
     if ( y > 1 - shield ) {
-      this.walls.S = !this.walls.S
+      map.wallH.set( this.x, this.y + 1, !map.wallH.get( this.x, this.y + 1 ) )
       return
     }
     if ( x < shield ) {
-      this.walls.W = !this.walls.W
+      map.wallV.set( this.x, this.y, !map.wallV.get( this.x, this.y ) )
       return
     }
     if ( x > 1 - shield ) {
-      this.walls.E = !this.walls.E
+      map.wallV.set( this.x + 1, this.y, !map.wallV.get( this.x + 1, this.y ) )
       return
     }
 
@@ -282,32 +241,12 @@ class Tiles extends EventEmitter {
   }
 
   /**
-   * Rotation is currently a total disaster.
-   * The underlying floor map gets shifted but the tiles never update
-   * That can be solved but it all feels very awkward. Needs a rethink on the
-   * structure of the map to allow rotations.
+   * Rotates each facet of the map format
    */
-  rotateFaces( amt ) {
-    this.tiles.forEach( tile => {
-        // Rotate wall faces
-      tile.walls.rotate( amt )
-    })
-
-    // Rotate floor positions using global map - naughty
-    let width = map.floor.data.shape[ 0 ]
-    let height = map.floor.data.shape[ 1 ]
-    let tmp = ndarray( new Uint8Array( width * height ), [ width, height ] )
-
-    // Just go clockwise for now
-    fill( tmp, ( y, x ) => {
-      return map.floor.data.get( x, height - 1 - y )
-    })
-
-    tmp.data.forEach( ( val, index ) => {
-      map.floor.data.data[ index ] = val
-    })
-
-    this.emit( 'update' )
+  rotate() {
+    map.floor.rotate()
+    map.wallH.rotate()
+    map.wallV.rotate()
   }
 }
 
@@ -388,41 +327,6 @@ function getColor( value ) {
   return colors[ value ]
 }
 
-/**
- * Renders the tile data at location x, y on screen
- */
-function renderTile( x, y, tile ) {
-  ctx.fillStyle = getColor( tile.type )
-  ctx.fillRect( ( x * BLOCK_SIZE ), ( y * BLOCK_SIZE ), BLOCK_SIZE, BLOCK_SIZE )
-
-  // render each wall segment
-  // ctx.strokeStyle = getColor( 4 )
-
-  // N
-  ctx.strokeStyle = getColor( tile.walls.N ? 4 : 0 )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
-  ctx.stroke()
-  // S
-  ctx.strokeStyle = getColor( tile.walls.S ? 4 : 0 )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, ( y + 1 ) * BLOCK_SIZE - 1 )
-  ctx.stroke()
-  // E
-  ctx.strokeStyle = getColor( tile.walls.E ? 4 : 0 )
-  ctx.beginPath()
-  ctx.moveTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, ( y + 1 ) * BLOCK_SIZE - 1 )
-  ctx.stroke()
-  // W
-  ctx.strokeStyle = getColor( tile.walls.W ? 4 : 0 )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
-  ctx.stroke()
-}
 
 function renderFloor( x, y ) {
   ctx.fillStyle = getColor( map.floor.get( x, y ) )
@@ -430,17 +334,23 @@ function renderFloor( x, y ) {
 }
 
 function renderWalls( x, y ) {
-  ctx.strokeStyle = getColor( map.wallH.get( x, y ) )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
-  ctx.stroke()
+  // if ( x < WIDTH - 1 ) {
+  if ( x < WIDTH ) {
+    ctx.strokeStyle = getColor( map.wallH.get( x, y ) ? 4 : 0 )
+    ctx.beginPath()
+    ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
+    ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
+    ctx.stroke()
+  }
 
-  ctx.strokeStyle = getColor( map.wallV.get( x, y ) )
-  ctx.beginPath()
-  ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-  ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
-  ctx.stroke()
+  // if ( y < HEIGHT - 1 ) {
+  if ( y < HEIGHT ) {
+    ctx.strokeStyle = getColor( map.wallV.get( x, y ) ? 4 : 0 )
+    ctx.beginPath()
+    ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
+    ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
+    ctx.stroke()
+  }
 }
 
 var render = function render() {
@@ -448,7 +358,6 @@ var render = function render() {
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
   for ( var x = 0; x < WIDTH; x++ ) {
     for ( var y = 0; y < HEIGHT; y++ ) {
-      //renderTile( x, y, tiles.get( x, y ) )
       if ( x < WIDTH - 1 && y < HEIGHT - 1 ) {
         renderFloor( x, y )
       }

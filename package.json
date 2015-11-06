@@ -30,6 +30,7 @@
     "ndarray-fill": "^1.0.1",
     "ndarray-unpack": "^1.0.0",
     "ndarray-warp": "^1.0.1",
+    "rotate-array": "^1.0.0",
     "zeros": "^1.0.0"
   },
   "devDependencies": {

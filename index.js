@@ -4,6 +4,7 @@ import EventEmitter from 'eventemitter3'
 import ndarray from 'ndarray'
 import unpack from 'ndarray-unpack'
 import fill from 'ndarray-fill'
+import rotate from 'rotate-array'
 
 import leveljs from 'level-js'
 import levelup from 'levelup'
@@ -196,8 +197,12 @@ class Walls {
     let faces = [ 'N', 'E', 'S', 'W' ]
     console.log( ...faces.map( dir => this[ dir ] ) )
   }
-  rotate() {
-    this.dir = [ 'W', 'N', 'E', 'S' ]
+  /**
+   * See tiles.rotate for some of this junk
+   * The rotate shizzle isnt happening at the moment
+   */
+  rotate( amount ) {
+    this.dir = rotate( this.dir, amount )
     this._makeProps( this.x, this.y )
   }
 }
@@ -252,8 +257,9 @@ class Tile {
 /**
  * Create the working list of tiles
  */
-class Tiles {
+class Tiles extends EventEmitter {
   constructor() {
+    super()
     this.tiles = []
     for ( let y = 0; y < HEIGHT; y++ ) {
       for ( let x = 0; x < WIDTH; x++ ) {
@@ -268,15 +274,38 @@ class Tiles {
     this.tiles[ x + WIDTH * y ] = tile
   }
 
-  rotateFaces() {
+  /**
+   * Rotation is currently a total disaster.
+   * The underlying floor map gets shifted but the tiles never update
+   * That can be solved but it all feels very awkward. Needs a rethink on the
+   * structure of the map to allow rotations.
+   */
+  rotateFaces( amt ) {
     this.tiles.forEach( tile => {
-      tile.walls.rotate()
+        // Rotate wall faces
+      tile.walls.rotate( amt )
     })
+
+    // Rotate floor positions using global map - naughty
+    let width = map.floor.data.shape[ 0 ]
+    let height = map.floor.data.shape[ 1 ]
+    let tmp = ndarray( new Uint8Array( width * height ), [ width, height ] )
+
+    // Just go clockwise for now
+    fill( tmp, ( y, x ) => {
+      return map.floor.data.get( x, height - 1 - y )
+    })
+
+    tmp.data.forEach( ( val, index ) => {
+      map.floor.data.data[ index ] = val
+    })
+
+    this.emit( 'update' )
   }
 }
 
 var tiles = window.tiles = new Tiles()
-
+tiles.on( 'update', () => render() )
 
 /**
  * Only works for square matrices

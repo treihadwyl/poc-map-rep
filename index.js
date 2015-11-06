@@ -8,12 +8,12 @@ var ndarray = window.ndarray = require( 'ndarray' )
 var unpack = window.unpack = require( 'ndarray-unpack' )
 var fill = window.fill = require( 'ndarray-fill' )
 
-const WIDTH = window.WIDTH = 10
-const HEIGHT = window.HEIGHT = 10
+const WIDTH = window.WIDTH = 2
+const HEIGHT = window.HEIGHT = 2
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
-const BLOCK_SIZE = 40
+const BLOCK_SIZE = 80
 
 
 /**
@@ -34,8 +34,8 @@ function checkBounds( num, min, max ) {
 // Array offsets into floor, wallH, wallV
 var offsets = [
   0,
-  ( WIDTH + 1 ) * HEIGHT,
-  ( ( WIDTH + 1 ) * HEIGHT ) + ( WIDTH * ( HEIGHT + 1 ) )
+  WIDTH * HEIGHT,
+  ( WIDTH * HEIGHT ) + ( WIDTH * ( HEIGHT + 1 ) )
 ]
 
 // Quick total byte length of array
@@ -55,7 +55,7 @@ var view = window.view = new Uint8Array( buf )
 window.Raw = class Raw extends EventEmitter {
   constructor( buffer, offset, width, height ) {
     super()
-    this.data = ndarray( new Uint8Array( buffer ), [ width, height ] )
+    this.data = ndarray( new Uint8Array( buffer ), [ width, height ], [ width, 1 ], offset )
   }
 
   get width() {
@@ -94,6 +94,8 @@ class MapFormat extends EventEmitter {
     this.wallV = new Raw( buffer, offsets[ 2 ], WIDTH + 1, HEIGHT )
 
     this.floor.on( 'update', () => render() )
+    this.wallH.on( 'update', () => render() )
+    this.wallV.on( 'update', () => render() )
   }
 }
 
@@ -159,6 +161,27 @@ class Tile {
    * Currently expects x and y clamped 0...1, 0,0 is TL, 1,1 is BR
    */
   onClick( x, y ) {
+    console.log( x, y )
+    // Check if mouse is at the top, which would denote changing the N wall
+    // Use 20% of size as a bound
+    // if ( y < .2 ) {
+    //   this.walls.N = !this.walls.N
+    //   return
+    // }
+    // if ( y > .8 ) {
+    //   this.walls.S = !this.walls.S
+    //   return
+    // }
+    // if ( x < .2 ) {
+    //   this.walls.W = !this.walls.W
+    //   return
+    // }
+    // if ( x > .8 ) {
+    //   this.walls.E = !this.walls.E
+    //   return
+    // }
+
+
     this.type = !this.type
   }
 }
@@ -268,26 +291,28 @@ function renderTile( x, y, tile ) {
   ctx.fillRect( x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 1, BLOCK_SIZE - 1 )
 
   // render each wall segment
-  ctx.strokeStyle = getColor( 4 )
+  // ctx.strokeStyle = getColor( 4 )
 
   // N
+  ctx.strokeStyle = getColor( tile.walls.N ? 4 : 0 )
   ctx.beginPath()
   ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
   ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, y * BLOCK_SIZE )
   ctx.stroke()
-
   // S
+  ctx.strokeStyle = getColor( tile.walls.S ? 4 : 0 )
   ctx.beginPath()
   ctx.moveTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
   ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
   ctx.stroke()
-
   // E
+  ctx.strokeStyle = getColor( tile.walls.E ? 4 : 0 )
   ctx.beginPath()
   ctx.moveTo( ( x + 1 ) * BLOCK_SIZE, y * BLOCK_SIZE )
   ctx.lineTo( ( x + 1 ) * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
   ctx.stroke()
   // W
+  ctx.strokeStyle = getColor( tile.walls.W ? 4 : 0 )
   ctx.beginPath()
   ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
   ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE )
@@ -313,7 +338,7 @@ canvas.addEventListener( 'mousedown', event => {
   let x = event.offsetX / BLOCK_SIZE
   let y = event.offsetY / BLOCK_SIZE
   tiles.get( ~~x, ~~y )
-    .onClick( x, y )
+    .onClick( x - ~~x, y - ~~y )
 })
 
 // document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => rotateCW() )

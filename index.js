@@ -10,20 +10,28 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
-const WIDTH = window.WIDTH = 3
-const HEIGHT = window.HEIGHT = 3
+const WIDTH = window.WIDTH = 2
+const HEIGHT = window.HEIGHT = 2
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
-const BLOCK_SIZE = 60
+const BLOCK_SIZE = 100
 
 var canvas = document.querySelector( '.canvas' )
 var ctx = window.ctx = canvas.getContext( '2d' )
 
 /**
- * This version has some overlap of the walls so there is some redundancy but
- * by making each array square it can be rotated far more easily
- * If walls are 3x3 then the walkable floor area will be 2x2
+ * This version extends the underlying grid to 4x4 sections which each 4x4 matrix
+ * representing one grid tile, with a redundant entry (which could be used for
+ * something else).
+ * 0, 0,
+ * 1, 0
+ * blank, wallH,
+ * wallV, tile
+ * This complicates a few bits and pieces but not by much and means somethings
+ * like taking slices out of the array are still easy enough, but, crucially, this
+ * massively simplifies rotation which is very handy for later rendering of
+ * map portions/slices.
  */
 
 
@@ -41,25 +49,21 @@ function checkBounds( num, min, max ) {
   return true
 }
 
-
-// Array offsets into floor, wallH, wallV
-var offsets = [
-  0,
-  ( ( WIDTH - 1 ) * ( HEIGHT - 1 ) ),
-  ( ( WIDTH - 1 ) * ( HEIGHT - 1 ) ) + ( WIDTH * HEIGHT )
-]
-
-// Quick total byte length of array
-var byteLength = (
-  ( ( WIDTH -1 ) * ( HEIGHT - 1 ) ) +
-  ( WIDTH * HEIGHT * 2 )
-)
+/**
+ * Each group of 4 represents one tile
+ * 0, 0
+ * 0, 0
+ * blank, wallH,
+ * wallV, tile
+ */
+var byteLength = ( WIDTH * 2 + 1 ) * ( HEIGHT * 2 + 1 )
 
 // Source of truth - underlying data store
 var buf = window.buf = new ArrayBuffer( byteLength )
 
 // A debug view on the data
 var view = window.view = new Uint8Array( buf )
+
 
 /**
  * Holds the raw 2d array data
@@ -147,13 +151,9 @@ class MapFormat extends EventEmitter {
   constructor( buffer ) {
     super()
 
-    this.floor = new Raw( buffer, offsets[ 0 ], WIDTH - 1, HEIGHT - 1 )
-    this.wallH = new Raw( buffer, offsets[ 1 ], WIDTH, HEIGHT )
-    this.wallV = new Raw( buffer, offsets[ 2 ], WIDTH, HEIGHT )
+    this.data = new Raw( buffer, 0, WIDTH * 2 + 1, HEIGHT * 2 + 1 )
 
-    this.floor.on( 'update', () => render() )
-    this.wallH.on( 'update', () => render() )
-    this.wallV.on( 'update', () => render() )
+    this.data.on( 'update', () => render() )
 
     this.buf = buffer
     this.saveKey = 'tr_map'
@@ -202,6 +202,7 @@ class MapFormat extends EventEmitter {
 var map = window.map = new MapFormat( buf )
 map.on( 'update', () => render() )
 
+
 /**
  * Tile just holds floor data and handles ops on tiles
  * Currently hardcoded to the map format object
@@ -211,36 +212,82 @@ class Tile {
     this.x = x
     this.y = y
 
+    //@TODO cache translations here, they are used again inside render
     Object.defineProperty( this, 'type', {
       get: function() {
-        return map.floor.get( x, y )
+        return map.data.get( x * 2 + 1, y * 2 + 1 )
       },
       set: function( value ) {
-        map.floor.set( x, y, value )
+        map.data.set( x * 2 + 1, y * 2 + 1, value )
       }
     })
+  }
+
+
+  render() {
+    console.log( 'rendering', this.x, this.y )
+    // Translate to global map buffer coords for a tile
+    let x = this.x * 2 + 1
+    let y = this.y * 2 + 1
+
+    // Render floor
+    ctx.fillStyle = getColor( map.data.get( x, y ) )
+    ctx.fillRect( ( this.x * BLOCK_SIZE ), ( this.y * BLOCK_SIZE ), BLOCK_SIZE, BLOCK_SIZE )
+
+    // Render top wall
+    ctx.strokeStyle = getColor( map.data.get( x, y - 1 ) ? 4 : 0 )
+    ctx.beginPath()
+    ctx.moveTo( this.x * BLOCK_SIZE, this.y * BLOCK_SIZE )
+    ctx.lineTo( ( this.x + 1 ) * BLOCK_SIZE - 1, this.y * BLOCK_SIZE )
+    ctx.stroke()
+
+    // Render left wall
+    ctx.strokeStyle = getColor( map.data.get( x - 1, y ) ? 4 : 0 )
+    ctx.beginPath()
+    ctx.moveTo( this.x * BLOCK_SIZE, this.y * BLOCK_SIZE )
+    ctx.lineTo( this.x * BLOCK_SIZE, ( this.y + 1 ) * BLOCK_SIZE )
+    ctx.stroke()
+
+    // If we're at the bottom or right edge then extra one needs to be rendered
+    if ( y === HEIGHT + 1 ) {
+      ctx.strokeStyle = getColor( map.data.get( x, y + 1 ) ? 4 : 0 )
+      ctx.beginPath()
+      ctx.moveTo( this.x * BLOCK_SIZE, ( this.y + 1 ) * BLOCK_SIZE )
+      ctx.lineTo( ( this.x + 1 ) * BLOCK_SIZE - 1, ( this.y + 1 ) * BLOCK_SIZE )
+      ctx.stroke()
+    }
+
+    if ( x === WIDTH + 1 ) {
+      ctx.strokeStyle = getColor( map.data.get( x + 1, y ) ? 4 : 0 )
+      ctx.beginPath()
+      ctx.moveTo( ( this.x + 1 ) * BLOCK_SIZE, this.y * BLOCK_SIZE )
+      ctx.lineTo( ( this.x + 1 ) * BLOCK_SIZE, ( this.y + 1 ) * BLOCK_SIZE )
+      ctx.stroke()
+    }
   }
 
   /**
    * Currently expects x and y clamped 0...1, 0,0 is TL, 1,1 is BR
    */
-  onClick( x, y ) {
-    let shield = .1
+  onClick( tilex, tiley ) {
+    let shield = .15
+    let x = this.x * 2 + 1
+    let y = this.y * 2 + 1
 
-    if ( y < shield ) {
-      map.wallH.set( this.x, this.y, !map.wallH.get( this.x, this.y ) )
+    if ( tiley < shield ) {
+      map.data.set( x, y - 1, !map.data.get( x, y - 1 ) )
       return
     }
-    if ( y > 1 - shield ) {
-      map.wallH.set( this.x, this.y + 1, !map.wallH.get( this.x, this.y + 1 ) )
+    if ( tiley > 1 - shield ) {
+      map.data.set( x, y + 1, !map.data.get( x, y + 1 ) )
       return
     }
-    if ( x < shield ) {
-      map.wallV.set( this.x, this.y, !map.wallV.get( this.x, this.y ) )
+    if ( tilex < shield ) {
+      map.data.set( x - 1, y, !map.data.get( x - 1, y ) )
       return
     }
-    if ( x > 1 - shield ) {
-      map.wallV.set( this.x + 1, this.y, !map.wallV.get( this.x + 1, this.y ) )
+    if ( tilex > 1 - shield ) {
+      map.data.set( x + 1, y, !map.data.get( x + 1, y ) )
       return
     }
 
@@ -273,17 +320,17 @@ class Tiles extends EventEmitter {
     this.tiles[ x + WIDTH * y ] = tile
   }
 
+  switchDim() {
+    let temp = map.wallV
+    map.wallV = map.wallH
+    map.wallH = temp
+  }
+
   /**
    * Rotates each facet of the map format
    */
   rotateCW() {
-    map.floor.rotateCW()
-    map.wallH.rotateCW()
-    map.wallV.rotateCW()
-
-    let temp = map.wallV
-    map.wallV = map.wallH
-    map.wallH = temp
+    map.data.rotateCW()
 
     // Increment and wrap to 4 cardinals
     this.dir = this.dir + 1
@@ -291,19 +338,6 @@ class Tiles extends EventEmitter {
       this.dir = 0
     }
 
-    // Translate the extra buffer column as rotate fills it
-    if ( this.dir === 1 ) {
-      map.wallH.translateX( -1 )
-    }
-    if ( this.dir === 2 ) {
-      map.wallH.translateX( -1 )
-    }
-    if ( this.dir === 3 ) {
-      map.wallH.translateY( -1 )
-    }
-    if ( this.dir === 0 ) {
-      map.wallH.translateY( -1 )
-    }
 
     render()
   }
@@ -336,18 +370,18 @@ class Tiles extends EventEmitter {
     //   map.wallV.translateY( -1 )
     //   map.wallH.translateY( -1 )
     // }
-    if ( this.dir === 1 ) {
-      map.wallH.translateX( -1 )
-    }
-    if ( this.dir === 2 ) {
-      map.wallH.translateX( -1 )
-    }
-    if ( this.dir === 3 ) {
-      map.wallH.translateY( -1 )
-    }
-    if ( this.dir === 0 ) {
-      map.wallH.translateY( -1 )
-    }
+    // if ( this.dir === 1 ) {
+    //   map.wallV.translateX( -1 )
+    // }
+    // if ( this.dir === 2 ) {
+    //   map.wallV.translateY( -1 )
+    // }
+    // if ( this.dir === 3 ) {
+    //   map.wallV.translateY( -1 )
+    // }
+    // if ( this.dir === 0 ) {
+    //   map.wallV.translateY( -1 )
+    // }
 
     render()
   }
@@ -356,40 +390,6 @@ class Tiles extends EventEmitter {
 var tiles = window.tiles = new Tiles()
 tiles.on( 'update', () => render() )
 
-/**
- * Only works for square matrices
- */
-window.transform = function transform( fn ) {
-  var start = performance.now()
-  fn = fn || function iterate( y, x ) {
-    return arr.get( x, arr.shape[ 1 ] - 1 - y )
-  }
-
-  fill( res, fn )
-
-  res.data.forEach( ( val, index ) => {
-    arr.data[ index ] = val
-  })
-  console.log( 'time', performance.now() - start )
-  render()
-  logdata( arr )
-}
-
-window.rotateCW = function rotateCW() {
-   transform( ( y, x ) => {
-    return arr.get( x, arr.shape[ 1 ] - 1 - y )
-  })
-}
-window.rotateCCW = function rotateCCW() {
-  transform( ( y, x ) => {
-    return arr.get( arr.shape[ 0 ] - 1 - x, y )
-  })
-}
-window.rotate180 = function rotate180() {
-  transform( ( y, x ) => {
-    return arr.get( arr.shape[ 1 ] - 1 - y, arr.shape[ 0 ] - 1 - x )
-  })
-}
 
 
 /**
@@ -455,6 +455,9 @@ function renderWalls( x, y ) {
     ctx.stroke()
   }
 }
+function renderTile( x, y ) {
+
+}
 
 var dirEl = document.querySelector( '.js-dir' )
 
@@ -463,11 +466,13 @@ var render = function render() {
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
   for ( var x = 0; x < WIDTH; x++ ) {
     for ( var y = 0; y < HEIGHT; y++ ) {
-      if ( x < WIDTH - 1 && y < HEIGHT - 1 ) {
-        renderFloor( x, y )
-      }
-
-      renderWalls( x, y )
+      // Use the tile, which is always at 1,1 of the 4 by 4 chunk, i.e.
+      // its on all the odd numbered rows/cols
+      // if ( x % 2 && y % 2 ) {
+      //   console.log( 'rendering' )
+      //   renderTile( x, y )
+      // }
+      tiles.get( x, y ).render()
     }
   }
 
@@ -499,3 +504,9 @@ document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => tiles
 document.querySelector( '.js-logfloor' ).addEventListener( 'click', event => logdata( map.floor.data ) )
 document.querySelector( '.js-logh' ).addEventListener( 'click', event => logdata( map.wallH.data ) )
 document.querySelector( '.js-logv' ).addEventListener( 'click', event => logdata( map.wallV.data ) )
+
+
+
+// for now fill the view
+// view.fill( 1 )
+// map.wallH.set( 0, 1, 1 )

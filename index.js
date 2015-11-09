@@ -10,12 +10,12 @@ import leveljs from 'level-js'
 import levelup from 'levelup'
 import promisify from 'level-promisify'
 
-const WIDTH = window.WIDTH = 2
-const HEIGHT = window.HEIGHT = 2
+const WIDTH = window.WIDTH = 5
+const HEIGHT = window.HEIGHT = 5
 
 const CANVAS_WIDTH = 640
 const CANVAS_HEIGHT = 480
-const BLOCK_SIZE = 100
+const BLOCK_SIZE = 50
 
 var canvas = document.querySelector( '.canvas' )
 var ctx = window.ctx = canvas.getContext( '2d' )
@@ -225,7 +225,7 @@ class Tile {
 
 
   render() {
-    console.log( 'rendering', this.x, this.y )
+    //console.log( 'rendering', this.x, this.y )
     // Translate to global map buffer coords for a tile
     let x = this.x * 2 + 1
     let y = this.y * 2 + 1
@@ -338,20 +338,13 @@ class Tiles extends EventEmitter {
       this.dir = 0
     }
 
-
     render()
   }
   /**
    * Rotates each facet of the map format
    */
   rotateCCW() {
-    map.floor.rotateCCW()
-    map.wallH.rotateCCW()
-    map.wallV.rotateCCW()
-
-    let temp = map.wallV
-    map.wallV = map.wallH
-    map.wallH = temp
+    map.data.rotateCCW()
 
     // decrement and wrap to 4 cardinals
     this.dir = this.dir - 1
@@ -359,29 +352,20 @@ class Tiles extends EventEmitter {
       this.dir = 3
     }
 
-    // Shift on east facing
-    // if ( this.dir === 3 ) {
-    //   map.wallV.translateX( -1 )
-    //   map.wallH.translateX( -1 )
-    // }
-    //
-    // // Do funky shift on west facing
-    // if ( this.dir === 1 ) {
-    //   map.wallV.translateY( -1 )
-    //   map.wallH.translateY( -1 )
-    // }
-    // if ( this.dir === 1 ) {
-    //   map.wallV.translateX( -1 )
-    // }
-    // if ( this.dir === 2 ) {
-    //   map.wallV.translateY( -1 )
-    // }
-    // if ( this.dir === 3 ) {
-    //   map.wallV.translateY( -1 )
-    // }
-    // if ( this.dir === 0 ) {
-    //   map.wallV.translateY( -1 )
-    // }
+    render()
+  }
+
+  /**
+   * Switches direction i.e. rotate 180
+   */
+  rotate180() {
+    map.data.rotate180()
+
+    // decrement and wrap to 4 cardinals
+    this.dir = this.dir - 1
+    if ( this.dir < 0 ) {
+      this.dir = 3
+    }
 
     render()
   }
@@ -430,35 +414,6 @@ function getColor( value ) {
   return colors[ value ]
 }
 
-
-function renderFloor( x, y ) {
-  ctx.fillStyle = getColor( map.floor.get( x, y ) )
-  ctx.fillRect( ( x * BLOCK_SIZE ), ( y * BLOCK_SIZE ), BLOCK_SIZE, BLOCK_SIZE )
-}
-
-function renderWalls( x, y ) {
-  // if ( x < WIDTH - 1 ) {
-  if ( x < WIDTH ) {
-    ctx.strokeStyle = getColor( map.wallH.get( x, y ) ? 4 : 0 )
-    ctx.beginPath()
-    ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-    ctx.lineTo( ( x + 1 ) * BLOCK_SIZE - 1, y * BLOCK_SIZE )
-    ctx.stroke()
-  }
-
-  // if ( y < HEIGHT - 1 ) {
-  if ( y < HEIGHT ) {
-    ctx.strokeStyle = getColor( map.wallV.get( x, y ) ? 4 : 0 )
-    ctx.beginPath()
-    ctx.moveTo( x * BLOCK_SIZE, y * BLOCK_SIZE )
-    ctx.lineTo( x * BLOCK_SIZE, ( y + 1 ) * BLOCK_SIZE - 1 )
-    ctx.stroke()
-  }
-}
-function renderTile( x, y ) {
-
-}
-
 var dirEl = document.querySelector( '.js-dir' )
 
 var render = function render() {
@@ -466,12 +421,6 @@ var render = function render() {
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT )
   for ( var x = 0; x < WIDTH; x++ ) {
     for ( var y = 0; y < HEIGHT; y++ ) {
-      // Use the tile, which is always at 1,1 of the 4 by 4 chunk, i.e.
-      // its on all the odd numbered rows/cols
-      // if ( x % 2 && y % 2 ) {
-      //   console.log( 'rendering' )
-      //   renderTile( x, y )
-      // }
       tiles.get( x, y ).render()
     }
   }
@@ -500,13 +449,5 @@ document.querySelector( '.js-save' ).addEventListener( 'click', event => map.sav
 document.querySelector( '.js-load' ).addEventListener( 'click', event => map.load() )
 document.querySelector( '.js-rotcw' ).addEventListener( 'click', event => tiles.rotateCW() )
 document.querySelector( '.js-rotccw' ).addEventListener( 'click', event => tiles.rotateCCW() )
-// document.querySelector( '.js-rot180' ).addEventListener( 'click', event => rotate180() )
-document.querySelector( '.js-logfloor' ).addEventListener( 'click', event => logdata( map.floor.data ) )
-document.querySelector( '.js-logh' ).addEventListener( 'click', event => logdata( map.wallH.data ) )
-document.querySelector( '.js-logv' ).addEventListener( 'click', event => logdata( map.wallV.data ) )
-
-
-
-// for now fill the view
-// view.fill( 1 )
-// map.wallH.set( 0, 1, 1 )
+document.querySelector( '.js-rot180' ).addEventListener( 'click', event => tiles.rotate180() )
+document.querySelector( '.js-logmap' ).addEventListener( 'click', event => logdata( map.data.data ) )
